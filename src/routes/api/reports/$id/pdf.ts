@@ -4,7 +4,7 @@ import type { StructuredReport } from "@/services/api";
 export const Route = createFileRoute("/api/reports/$id/pdf")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ params, request }) => {
         const { getServerSupabase } = await import("@/lib/supabase-server");
         const supabase = getServerSupabase();
         const { data, error } = await supabase
@@ -20,7 +20,11 @@ export const Route = createFileRoute("/api/reports/$id/pdf")({
         }
 
         const { renderReportPdf } = await import("@/lib/pdf-report.server");
-        const pdfBytes = renderReportPdf(structured);
+        const origin = new URL(request.url).origin;
+        const audioUrl = structured.audio_readback_enabled
+          ? `${origin}/api/reports/${data.id}/audio`
+          : undefined;
+        const pdfBytes = renderReportPdf(structured, { audioUrl });
         const filename = `maai-report-${data.id}.pdf`;
         return new Response(pdfBytes as unknown as BodyInit, {
           status: 200,

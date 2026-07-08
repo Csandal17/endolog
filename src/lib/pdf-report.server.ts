@@ -3,7 +3,10 @@
 import { jsPDF } from "jspdf";
 import type { StructuredReport } from "@/services/api";
 
-export function renderReportPdf(report: StructuredReport): Uint8Array {
+export function renderReportPdf(
+  report: StructuredReport,
+  opts: { audioUrl?: string } = {},
+): Uint8Array {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const margin = 48;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -94,9 +97,66 @@ export function renderReportPdf(report: StructuredReport): Uint8Array {
   bullets(report.follow_up_actions);
   y += 6;
 
+  const s = report.socrates;
+  const socratesRows: [string, string | null][] = [
+    ["Site", s.site],
+    ["Onset", s.onset],
+    ["Character", s.character],
+    ["Radiation", s.radiation],
+    ["Associations", s.associations],
+    ["Time course", s.time_course],
+    ["Exacerbating / relieving", s.exacerbating_relieving],
+    ["Severity", s.severity],
+  ];
+  heading("SOCRATES pain assessment");
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(110);
+  ensure(12);
+  doc.text(
+    "Site · Onset · Character · Radiation · Associations · Time course · Exacerbating/relieving · Severity",
+    margin,
+    y,
+  );
+  y += 14;
+  doc.setTextColor(40);
+  for (const [label, value] of socratesRows) {
+    const text = value ?? "Not described";
+    const lines = doc.splitTextToSize(`${label}: ${text}`, maxWidth) as string[];
+    doc.setFont("helvetica", value ? "normal" : "italic");
+    doc.setFontSize(11);
+    doc.setTextColor(value ? 40 : 140);
+    for (const line of lines) {
+      ensure(14);
+      doc.text(line, margin, y);
+      y += 14;
+    }
+  }
+  doc.setTextColor(40);
+  y += 6;
+
   if (report.clinical_terms.length) {
     heading("Extracted clinical terms");
     body(report.clinical_terms.join(", "));
+    y += 6;
+  }
+
+  if (report.audio_readback_enabled && opts.audioUrl) {
+    heading("Accessibility · audio read-back");
+    body(
+      "An audio read-back of this record is available. Open the link below in a browser to listen. This is an opt-in accessibility feature.",
+    );
+    ensure(16);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(30, 90, 180);
+    const linkLines = doc.splitTextToSize(opts.audioUrl, maxWidth) as string[];
+    for (const line of linkLines) {
+      ensure(14);
+      doc.textWithLink(line, margin, y, { url: opts.audioUrl });
+      y += 14;
+    }
+    doc.setTextColor(40);
   }
 
   const buffer = doc.output("arraybuffer");

@@ -61,6 +61,7 @@ type IntakeForm = {
   sex: string;
   clinician: string;
   notes: string;
+  include_audio_readback: boolean;
 };
 
 const emptyForm: IntakeForm = {
@@ -69,6 +70,7 @@ const emptyForm: IntakeForm = {
   sex: "",
   clinician: "",
   notes: "",
+  include_audio_readback: false,
 };
 
 type LogEntry = {
@@ -179,6 +181,7 @@ function Dashboard() {
         sex: form.sex || undefined,
         clinician: form.clinician || undefined,
         input_text: form.notes.trim(),
+        include_audio_readback: form.include_audio_readback,
       });
       if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
       // Fetch the persisted report so the preview renders the exact bytes
@@ -240,6 +243,7 @@ function Dashboard() {
                     submitting={submitting}
                     error={error ?? job?.error ?? null}
                     onReset={() => setForm(emptyForm)}
+                    onToggleAudio={(v) => setForm((f) => ({ ...f, include_audio_readback: v }))}
                   />
                 </motion.div>
               ) : (
@@ -320,6 +324,7 @@ function IntakeCard({
   submitting,
   error,
   onReset,
+  onToggleAudio,
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -327,6 +332,7 @@ function IntakeCard({
   submitting: boolean;
   error: string | null;
   onReset: () => void;
+  onToggleAudio: (value: boolean) => void;
 }) {
   return (
     <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
@@ -386,6 +392,23 @@ function IntakeCard({
             <span>{error}</span>
           </div>
         )}
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border/60 bg-parchment/60 p-3">
+          <input
+            type="checkbox"
+            checked={form.include_audio_readback}
+            onChange={(e) => onToggleAudio(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border/70 accent-primary"
+            aria-describedby="audio-readback-hint"
+          />
+          <span className="text-sm">
+            <span className="font-medium text-charcoal">Include accessibility audio read-back</span>
+            <span id="audio-readback-hint" className="mt-0.5 block text-xs text-muted-foreground">
+              Adds a link to a spoken version of the PDF report — helpful for
+              vision-impaired patients or when reviewing on the go.
+            </span>
+          </span>
+        </label>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button

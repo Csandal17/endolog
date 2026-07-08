@@ -28,6 +28,11 @@ export type IntakePayload = {
   sex?: string;
   clinician?: string;
   input_text: string;
+  /**
+   * When true, the generated PDF includes an accessibility "audio read-back"
+   * section with a link to a TTS version of the report.
+   */
+  include_audio_readback?: boolean;
 };
 
 export type AgentStage = {
@@ -44,6 +49,21 @@ export type StructuredReport = {
   recommendations: string[];
   follow_up_actions: string[];
   clinical_terms: string[];
+  /**
+   * SOCRATES pain/symptom assessment. Any field may be null if the
+   * intake text did not describe it.
+   */
+  socrates: {
+    site: string | null;
+    onset: string | null;
+    character: string | null;
+    radiation: string | null;
+    associations: string | null;
+    time_course: string | null;
+    exacerbating_relieving: string | null;
+    severity: string | null;
+  };
+  audio_readback_enabled: boolean;
   generated_at: string;
   patient: {
     name: string;
