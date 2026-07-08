@@ -61,6 +61,7 @@ type IntakeForm = {
   sex: string;
   clinician: string;
   notes: string;
+  include_audio_readback: boolean;
 };
 
 const emptyForm: IntakeForm = {
@@ -69,6 +70,7 @@ const emptyForm: IntakeForm = {
   sex: "",
   clinician: "",
   notes: "",
+  include_audio_readback: false,
 };
 
 type LogEntry = {
