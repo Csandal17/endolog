@@ -243,6 +243,7 @@ function Dashboard() {
                     submitting={submitting}
                     error={error ?? job?.error ?? null}
                     onReset={() => setForm(emptyForm)}
+                    onToggleAudio={(v) => setForm((f) => ({ ...f, include_audio_readback: v }))}
                   />
                 </motion.div>
               ) : (
