@@ -981,6 +981,11 @@ function VoiceControls({
   const [error, setError] = useState<string | null>(null);
   const [rate, setRate] = useState(1);
   const [status, setStatus] = useState("");
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+  const [micPermission, setMicPermission] = useState<
+    "unknown" | "prompt" | "granted" | "denied" | "unsupported"
+  >("unknown");
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -988,12 +993,43 @@ function VoiceControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const cachedForRef = useRef<string | null>(null);
+  const lastAnnouncedRef = useRef(0);
 
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
       audioRef.current?.pause();
+    };
+  }, []);
+
+  // Query mic permission state on mount so we can show the right prompt.
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicPermission("unsupported");
+      return;
+    }
+    const perms = (navigator as Navigator & {
+      permissions?: {
+        query: (d: { name: PermissionName }) => Promise<PermissionStatus>;
+      };
+    }).permissions;
+    if (!perms?.query) {
+      setMicPermission("prompt");
+      return;
+    }
+    let status: PermissionStatus | null = null;
+    perms
+      .query({ name: "microphone" as PermissionName })
+      .then((s) => {
+        status = s;
+        setMicPermission(s.state as "granted" | "denied" | "prompt");
+        s.onchange = () => setMicPermission(s.state as "granted" | "denied" | "prompt");
+      })
+      .catch(() => setMicPermission("prompt"));
+    return () => {
+      if (status) status.onchange = null;
     };
   }, []);
 
