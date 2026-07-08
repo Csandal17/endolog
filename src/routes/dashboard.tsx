@@ -353,7 +353,7 @@ function IntakeCard({
         <Field
           label="What have you been experiencing?"
           required
-          hint="In your own words, in any language. Speak it or type it — Maai will map it to clinical terms."
+          hint="In your own words. Speak it or type it — Maai will map it to clinical terms."
         >
           <Textarea
             value={form.notes}
