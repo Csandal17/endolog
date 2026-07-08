@@ -59,6 +59,11 @@
   --color-sage: var(--sage);
   --color-parchment: var(--parchment);
   --color-charcoal: var(--charcoal);
+  --color-pink: var(--pink);
+  --color-powder: var(--powder);
+  --color-butter: var(--butter);
+  --color-warm-grey: var(--warm-grey);
+  --color-stone: var(--stone);
 
   /* Font families */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -68,62 +73,67 @@
 :root {
   --radius: 0.75rem;
 
-  /* Parchment / off-white background */
-  --background: oklch(0.975 0.008 95);
-  --foreground: oklch(0.18 0.02 220);
+  /* Parchment / off-white #F3EDE3 */
+  --background: oklch(0.945 0.014 80);
+  --foreground: oklch(0.16 0.006 60); /* Charcoal #141210 */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 220);
+  --card: oklch(0.985 0.006 85);
+  --card-foreground: oklch(0.16 0.006 60);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 220);
+  --popover: oklch(0.985 0.006 85);
+  --popover-foreground: oklch(0.16 0.006 60);
 
-  /* Deep teal primary */
-  --primary: oklch(0.42 0.075 195);
-  --primary-foreground: oklch(0.98 0.003 100);
+  /* Soft Pink #F5B8DB primary */
+  --primary: oklch(0.82 0.11 340);
+  --primary-foreground: oklch(0.16 0.006 60);
 
-  --secondary: oklch(0.94 0.015 100);
-  --secondary-foreground: oklch(0.18 0.02 220);
+  --secondary: oklch(0.9 0.012 80);
+  --secondary-foreground: oklch(0.16 0.006 60);
 
-  --muted: oklch(0.94 0.01 95);
-  --muted-foreground: oklch(0.52 0.02 220);
+  --muted: oklch(0.92 0.01 80);
+  --muted-foreground: oklch(0.47 0.008 70); /* Warm grey #646059 */
 
-  /* Soft blue accent */
-  --accent: oklch(0.72 0.06 230);
-  --accent-foreground: oklch(0.18 0.02 220);
+  /* Powder blue accent #B6CAEB */
+  --accent: oklch(0.83 0.05 255);
+  --accent-foreground: oklch(0.16 0.006 60);
 
-  --destructive: oklch(0.55 0.18 25);
+  --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.98 0.003 100);
 
-  --border: oklch(0.88 0.01 95);
-  --input: oklch(0.88 0.01 95);
-  --ring: oklch(0.42 0.075 195);
+  --border: oklch(0.75 0.003 80); /* Light stone grey #A2A2A1 */
+  --input: oklch(0.86 0.006 80);
+  --ring: oklch(0.82 0.11 340);
 
-  /* Charts — healthcare themed */
-  --chart-1: oklch(0.42 0.075 195);
-  --chart-2: oklch(0.72 0.06 230);
-  --chart-3: oklch(0.55 0.12 160);
-  --chart-4: oklch(0.68 0.1 50);
-  --chart-5: oklch(0.52 0.08 260);
+  --chart-1: oklch(0.82 0.11 340); /* pink */
+  --chart-2: oklch(0.83 0.05 255); /* powder */
+  --chart-3: oklch(0.72 0.11 125); /* sage */
+  --chart-4: oklch(0.87 0.13 95);  /* butter */
+  --chart-5: oklch(0.47 0.008 70); /* warm grey */
 
-  /* Sidebar */
-  --sidebar: oklch(0.96 0.008 95);
-  --sidebar-foreground: oklch(0.18 0.02 220);
-  --sidebar-primary: oklch(0.42 0.075 195);
-  --sidebar-primary-foreground: oklch(0.98 0.003 100);
-  --sidebar-accent: oklch(0.94 0.015 100);
-  --sidebar-accent-foreground: oklch(0.18 0.02 220);
-  --sidebar-border: oklch(0.88 0.01 95);
-  --sidebar-ring: oklch(0.42 0.075 195);
+  --sidebar: oklch(0.96 0.01 80);
+  --sidebar-foreground: oklch(0.16 0.006 60);
+  --sidebar-primary: oklch(0.82 0.11 340);
+  --sidebar-primary-foreground: oklch(0.16 0.006 60);
+  --sidebar-accent: oklch(0.9 0.012 80);
+  --sidebar-accent-foreground: oklch(0.16 0.006 60);
+  --sidebar-border: oklch(0.75 0.003 80);
+  --sidebar-ring: oklch(0.82 0.11 340);
 
-  /* Healthcare semantic tokens */
-  --teal: oklch(0.42 0.075 195);
-  --teal-foreground: oklch(0.98 0.003 100);
-  --blue-accent: oklch(0.72 0.06 230);
-  --coral: oklch(0.68 0.14 35);
-  --sage: oklch(0.62 0.06 145);
-  --parchment: oklch(0.975 0.008 95);
-  --charcoal: oklch(0.18 0.02 220);
+  /* Brand tokens (Intelly palette) */
+  --pink: oklch(0.82 0.11 340);     /* #F5B8DB */
+  --sage: oklch(0.72 0.11 125);     /* #9AAB63 */
+  --powder: oklch(0.83 0.05 255);   /* #B6CAEB */
+  --butter: oklch(0.87 0.13 95);    /* #F5D867 */
+  --charcoal: oklch(0.16 0.006 60); /* #141210 */
+  --warm-grey: oklch(0.47 0.008 70);/* #646059 */
+  --stone: oklch(0.75 0.003 80);    /* #A2A2A1 */
+  --parchment: oklch(0.945 0.014 80);/* #F3EDE3 */
+
+  /* Legacy aliases kept so existing landing page keeps rendering */
+  --teal: oklch(0.72 0.11 125);
+  --teal-foreground: oklch(0.16 0.006 60);
+  --blue-accent: oklch(0.83 0.05 255);
+  --coral: oklch(0.82 0.11 340);
 }
 
 .dark {

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import {
   Activity,
@@ -56,10 +57,14 @@ function Nav() {
           <a href="#story" className="hover:text-foreground">Story</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" className="hidden sm:inline-flex">Sign in</Button>
-          <Button className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
-            Get the app
-            <ArrowRight className="ml-1 h-4 w-4" />
+          <Button variant="ghost" className="hidden sm:inline-flex" asChild>
+            <Link to="/dashboard">Clinician sign-in</Link>
+          </Button>
+          <Button className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+            <Link to="/dashboard">
+              Open dashboard
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
           </Button>
         </div>
       </div>
