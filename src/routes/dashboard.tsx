@@ -373,8 +373,7 @@ function IntakeCard({
           <UserRound className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-serif text-2xl leading-none tracking-tight">Patient intake</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Agent 1 · free-text collection</p>
+          <h2 className="font-serif text-2xl leading-none tracking-tight">My Pain Profile</h2>
         </div>
       </div>
 
@@ -539,8 +538,9 @@ function PainNrsField({
         </div>
       </div>
 
+      <h3 className="mt-6 font-serif text-xl leading-none tracking-tight">Endoscale</h3>
       <div
-        className="mt-6"
+        className="mt-4"
         role="group"
         aria-labelledby="pain-scale-label"
       >
@@ -721,9 +721,9 @@ function ReportPreview({
           </div>
           <div>
             <h2 className="font-serif text-2xl leading-none tracking-tight">Report preview</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {done ? "Structured output from agent 3" : "Populates as the pipeline runs"}
-            </p>
+            {done && (
+              <p className="mt-1 text-xs text-muted-foreground">Structured output from agent 3</p>
+            )}
           </div>
         </div>
         {done && <DownloadButton job={job} reportId={reportId} />}
