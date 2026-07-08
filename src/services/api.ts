@@ -155,3 +155,9 @@ export function downloadReport(reportId: string): void {
   a.click();
   a.remove();
 }
+
+export function deleteReport(reportId: string): Promise<void> {
+  return request<void>(`/api/reports/${encodeURIComponent(reportId)}`, {
+    method: "DELETE",
+  });
+}
