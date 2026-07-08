@@ -181,6 +181,7 @@ function Dashboard() {
         sex: form.sex || undefined,
         clinician: form.clinician || undefined,
         input_text: form.notes.trim(),
+        include_audio_readback: form.include_audio_readback,
       });
       if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
       // Fetch the persisted report so the preview renders the exact bytes
