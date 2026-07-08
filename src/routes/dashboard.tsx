@@ -255,7 +255,7 @@ function Dashboard() {
           </section>
 
           <section>
-            <ReportPreview job={job} form={form} />
+            <ReportPreview job={job} form={form} reportId={reportId} />
           </section>
         </div>
 
