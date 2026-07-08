@@ -11,7 +11,6 @@ import {
   Sparkles,
   Stethoscope,
   UserRound,
-  HeartPulse,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,8 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Clinical intake · Intelly" },
-      { name: "description", content: "Submit patient information and generate a structured clinical PDF report." },
+      { title: "Log a symptom · Maai" },
+      { name: "description", content: "Log what you've been experiencing in your own words. Maai maps it to clinical terms so you have a clear record for every appointment." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -199,12 +198,12 @@ function TopBar() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <HeartPulse className="h-5 w-5" />
+          <div className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
+            <span className="font-serif text-base leading-none">M</span>
           </div>
-          <span className="font-serif text-xl tracking-tight">Intelly</span>
+          <span className="font-serif text-xl tracking-tight">Maai</span>
           <Badge className="ml-2 rounded-full bg-butter/40 text-charcoal hover:bg-butter/40">
-            Clinical
+            Your log
           </Badge>
         </Link>
         <Link
