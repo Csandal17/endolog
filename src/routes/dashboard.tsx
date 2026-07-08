@@ -1357,7 +1357,7 @@ function VoiceControls({
         onClick={recording ? stopRecording : startRecording}
         disabled={
           transcribing ||
-          (!recording && micPermission !== "granted" && micPermission !== "checking")
+          (!recording && micPermission !== "granted" && micPermission !== "unknown")
         }
         className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
           recording
@@ -1366,7 +1366,7 @@ function VoiceControls({
         } disabled:cursor-not-allowed disabled:opacity-60`}
         aria-pressed={recording}
         aria-disabled={
-          !recording && micPermission !== "granted" && micPermission !== "checking"
+          !recording && micPermission !== "granted" && micPermission !== "unknown"
         }
         aria-label={recording ? "Stop recording" : "Dictate with your voice"}
         title={
