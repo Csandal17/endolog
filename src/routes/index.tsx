@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Sparkles,
   Clock,
-  Languages,
   ShieldCheck,
   Stethoscope,
   NotebookPen,
@@ -111,10 +110,6 @@ function Hero() {
             </Button>
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-warm-grey">
-            <div className="flex items-center gap-1.5">
-              <Languages className="h-4 w-4 text-primary" />
-              Log in any language
-            </div>
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-primary" />
               Your words stay yours
@@ -297,7 +292,7 @@ const steps = [
   {
     icon: NotebookPen,
     title: "Describe it in your own words",
-    body: "Any language. Any level of detail. A sentence a day is enough. Maai never asks you to translate your body into a form.",
+    body: "Any level of detail. A sentence a day is enough. Maai never asks you to translate your body into a form.",
     tint: "pink",
   },
   {
