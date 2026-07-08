@@ -538,8 +538,9 @@ function PainNrsField({
         </div>
       </div>
 
+      <h3 className="mt-6 font-serif text-xl leading-none tracking-tight">Endoscale</h3>
       <div
-        className="mt-6"
+        className="mt-4"
         role="group"
         aria-labelledby="pain-scale-label"
       >
