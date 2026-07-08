@@ -348,6 +348,9 @@ function Header() {
 function IntakeCard({
   form,
   update,
+  onPainScore,
+  onPainDateTime,
+  onPainDateTimeNow,
   submit,
   submitting,
   error,
@@ -355,6 +358,9 @@ function IntakeCard({
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onPainScore: (n: number) => void;
+  onPainDateTime: (v: string) => void;
+  onPainDateTimeNow: () => void;
   submit: (e: React.FormEvent) => void;
   submitting: boolean;
   error: string | null;
@@ -387,6 +393,14 @@ function IntakeCard({
             <Input value={form.clinician} onChange={update("clinician")} placeholder="Dr. A. Osei" />
           </Field>
         </div>
+
+        <PainNrsField
+          score={form.pain_score}
+          recordedAt={form.pain_recorded_at}
+          onScore={onPainScore}
+          onDateTime={onPainDateTime}
+          onNow={onPainDateTimeNow}
+        />
 
         <Field
           label="What have you been experiencing?"
