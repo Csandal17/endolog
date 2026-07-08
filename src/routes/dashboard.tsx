@@ -183,7 +183,7 @@ function Dashboard() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.patient_name.trim() || !form.notes.trim()) {
-      setError("Patient name and clinical notes are required.");
+      setError("Name and clinical notes are required.");
       return;
     }
     setError(null);
@@ -379,17 +379,17 @@ function IntakeCard({
 
       <form onSubmit={submit} className="mt-6 space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Patient name" required>
-            <Input value={form.patient_name} onChange={update("patient_name")} placeholder="Jane Doe" />
+          <Field label="Name" required>
+            <Input
+              value={form.patient_name}
+              onChange={update("patient_name")}
+              placeholder="Jane Doe"
+              name="name"
+              autoComplete="name"
+            />
           </Field>
           <Field label="Date of birth">
-            <Input type="date" value={form.dob} onChange={update("dob")} />
-          </Field>
-          <Field label="Sex at birth">
-            <Input value={form.sex} onChange={update("sex")} placeholder="Female / Male / Other" />
-          </Field>
-          <Field label="Clinician">
-            <Input value={form.clinician} onChange={update("clinician")} placeholder="Dr. A. Osei" />
+            <Input type="date" value={form.dob} onChange={update("dob")} autoComplete="bday" />
           </Field>
         </div>
 
