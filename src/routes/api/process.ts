@@ -6,6 +6,7 @@ type Body = {
   sex?: string;
   clinician?: string;
   input_text?: string;
+  include_audio_readback?: boolean;
 };
 
 export const Route = createFileRoute("/api/process")({
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/api/process")({
             sex: body.sex,
             clinician: body.clinician,
             input_text,
+            include_audio_readback: Boolean(body.include_audio_readback),
           });
 
           const { data: reportRow, error: reportError } = await supabase
