@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { jsPDF } from "jspdf";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -566,7 +567,7 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
             </p>
           </div>
         </div>
-        {done && <DownloadButton job={job} />}
+        {done && <DownloadButton job={job} report={report} form={form} />}
       </div>
 
       <div className="mt-6 rounded-2xl border border-border/60 bg-parchment p-6 shadow-inner">
@@ -586,7 +587,15 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
   );
 }
 
-function DownloadButton({ job }: { job: JobStatus }) {
+function DownloadButton({
+  job,
+  report,
+  form,
+}: {
+  job: JobStatus;
+  report?: JobStatus["report"];
+  form: IntakeForm;
+}) {
   const href = job.pdf_url
     ? job.pdf_url.startsWith("http")
       ? job.pdf_url
@@ -608,13 +617,85 @@ function DownloadButton({ job }: { job: JobStatus }) {
   }
   return (
     <button
-      onClick={() => alert("Demo mode — connect VITE_API_BASE_URL to enable PDF download.")}
+      onClick={() => generateClientPdf(report, form)}
       className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+      title="Generated locally in your browser. Set VITE_API_BASE_URL to use a backend-rendered PDF."
     >
       <Download className="h-4 w-4" />
       Download PDF
     </button>
   );
+}
+
+function generateClientPdf(report: JobStatus["report"] | undefined, form: IntakeForm) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 48;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text("Maai · Symptom record", margin, y);
+  y += 26;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(new Date().toLocaleString(), margin, y);
+  y += 20;
+  doc.setTextColor(20);
+
+  const patient = report?.patient ?? {
+    Name: form.patient_name,
+    "Date of birth": form.dob,
+    Sex: form.sex,
+    Clinician: form.clinician,
+  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Patient", margin, y);
+  y += 16;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  for (const [k, v] of Object.entries(patient)) {
+    if (!v) continue;
+    ensureSpace(16);
+    doc.text(`${k}: ${v}`, margin, y);
+    y += 14;
+  }
+  y += 8;
+
+  const sections = report?.sections ?? [
+    { title: "Notes", content: form.notes || "(no notes)" },
+  ];
+  for (const section of sections) {
+    ensureSpace(28);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(section.title, margin, y);
+    y += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(section.content ?? "", maxWidth) as string[];
+    for (const line of lines) {
+      ensureSpace(14);
+      doc.text(line, margin, y);
+      y += 14;
+    }
+    y += 10;
+  }
+
+  const safeName = (form.patient_name || "record").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase();
+  doc.save(`maai-${safeName}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 function EmptyPreview() {
