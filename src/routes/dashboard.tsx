@@ -1355,14 +1355,29 @@ function VoiceControls({
       <button
         type="button"
         onClick={recording ? stopRecording : startRecording}
-        disabled={transcribing}
+        disabled={
+          transcribing ||
+          (!recording && micPermission !== "granted" && micPermission !== "checking")
+        }
         className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
           recording
             ? "bg-primary text-primary-foreground hover:bg-primary/90"
             : "bg-pink/25 text-charcoal hover:bg-pink/40"
-        } disabled:opacity-60`}
+        } disabled:cursor-not-allowed disabled:opacity-60`}
         aria-pressed={recording}
+        aria-disabled={
+          !recording && micPermission !== "granted" && micPermission !== "checking"
+        }
         aria-label={recording ? "Stop recording" : "Dictate with your voice"}
+        title={
+          micPermission === "denied"
+            ? "Microphone access is blocked — enable it in your browser's site settings."
+            : micPermission === "unsupported"
+              ? "This browser doesn't support microphone input."
+              : micPermission === "prompt"
+                ? "Allow microphone access to enable dictation."
+                : undefined
+        }
       >
         {transcribing ? (
           <>
