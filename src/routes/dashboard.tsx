@@ -373,14 +373,14 @@ function Header() {
   return (
     <div className="max-w-3xl">
       <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">
-        Clinical intake
+        YOUR LOG
       </p>
       <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
-        Turn free-text notes into a structured report.
+        Tell us how you've been.
       </h1>
       <p className="mt-3 text-muted-foreground">
-        Submit patient information below. Our three-agent pipeline intakes, normalises against
-        clinical schemas, and produces a downloadable PDF report.
+        Describe it in your own words, however feels natural. Maai turns it into a clear record
+        you can bring to your next appointment.
       </p>
     </div>
   );
