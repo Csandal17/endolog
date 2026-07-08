@@ -582,37 +582,19 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
 
 function DownloadButton({
   job,
-  report,
-  form,
+  reportId,
 }: {
   job: JobStatus;
-  report?: JobStatus["report"];
-  form: IntakeForm;
+  reportId: string | null;
 }) {
-  const href = job.pdf_url
-    ? job.pdf_url.startsWith("http")
-      ? job.pdf_url
-      : `${API_BASE}${job.pdf_url}`
-    : null;
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        <Download className="h-4 w-4" />
-        Download PDF
-      </a>
-    );
-  }
+  const id = reportId ?? job.report_id ?? null;
   return (
     <button
-      onClick={() => generateClientPdf(report, form)}
-      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      title="Generated locally in your browser. Set VITE_API_BASE_URL to use a backend-rendered PDF."
+      type="button"
+      onClick={() => id && api.downloadReport(id)}
+      disabled={!id}
+      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+      title="Fetches the PDF from the backend (mock today, FastAPI later)."
     >
       <Download className="h-4 w-4" />
       Download PDF
