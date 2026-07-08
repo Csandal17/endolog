@@ -114,6 +114,8 @@ function Dashboard() {
   // Load persisted entries after mount (avoid SSR/hydration mismatch)
   useEffect(() => {
     setEntries(readEntries());
+    // Seed pain timestamp with "now" once, client-side, to avoid SSR mismatch.
+    setForm((f) => (f.pain_recorded_at ? f : { ...f, pain_recorded_at: nowLocalDatetime() }));
   }, []);
 
   // When a job completes, persist an entry once.
@@ -172,12 +174,15 @@ function Dashboard() {
     animateStages(setJob, mockTimerRef);
 
     try {
+      const painLine = `Pain (NRS 0–10): ${form.pain_score}/10${
+        form.pain_recorded_at ? ` — recorded ${formatPainWhen(form.pain_recorded_at)}` : ""
+      }`;
       const res = await api.processPatientIntake({
         patient_name: form.patient_name.trim(),
         dob: form.dob || undefined,
         sex: form.sex || undefined,
         clinician: form.clinician || undefined,
-        input_text: form.notes.trim(),
+        input_text: `${painLine}\n\n${form.notes.trim()}`,
       });
       if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
       // Fetch the persisted report so the preview renders the exact bytes
