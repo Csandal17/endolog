@@ -541,7 +541,15 @@ function ProgressCard({
   );
 }
 
-function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm }) {
+function ReportPreview({
+  job,
+  form,
+  reportId,
+}: {
+  job: JobStatus | null;
+  form: IntakeForm;
+  reportId: string | null;
+}) {
   const empty = !job;
   const done = job?.status === "complete";
   const report = job?.report;
@@ -560,7 +568,7 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
             </p>
           </div>
         </div>
-        {done && <DownloadButton job={job} report={report} form={form} />}
+        {done && <DownloadButton job={job} reportId={reportId} />}
       </div>
 
       <div className="mt-6 rounded-2xl border border-border/60 bg-parchment p-6 shadow-inner">
