@@ -12,6 +12,8 @@ import {
   Stethoscope,
   UserRound,
   AlertCircle,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -42,6 +44,7 @@ type JobStatus = {
   report?: { patient?: Record<string, string>; sections: ReportSection[] };
   pdf_url?: string;
   error?: string;
+  terms?: string[];
 };
 
 type IntakeForm = {
@@ -60,6 +63,36 @@ const emptyForm: IntakeForm = {
   notes: "",
 };
 
+type LogEntry = {
+  id: string;
+  submittedAt: string; // ISO
+  patientName: string;
+  notesExcerpt: string;
+  terms: string[];
+};
+
+const ENTRIES_KEY = "maai:entries:v1";
+
+function readEntries(): LogEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(ENTRIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as LogEntry[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeEntries(next: LogEntry[]) {
+  try {
+    window.localStorage.setItem(ENTRIES_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / privacy mode */
+  }
+}
+
 function Dashboard() {
   const [form, setForm] = useState<IntakeForm>(emptyForm);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -67,6 +100,47 @@ function Dashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockTimerRef = useRef<number | null>(null);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const savedForJobRef = useRef<string | null>(null);
+
+  // Load persisted entries after mount (avoid SSR/hydration mismatch)
+  useEffect(() => {
+    setEntries(readEntries());
+  }, []);
+
+  // When a job completes, persist an entry once.
+  useEffect(() => {
+    if (!job || job.status !== "complete") return;
+    const key = jobId ?? "job";
+    if (savedForJobRef.current === key) return;
+    savedForJobRef.current = key;
+    const terms = deriveTerms(job, form);
+    const entry: LogEntry = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      submittedAt: new Date().toISOString(),
+      patientName: form.patient_name || "You",
+      notesExcerpt: (form.notes || "").trim().slice(0, 220),
+      terms,
+    };
+    setEntries((prev) => {
+      const next = [entry, ...prev].slice(0, 100);
+      writeEntries(next);
+      return next;
+    });
+  }, [job, jobId, form]);
+
+  function deleteEntry(id: string) {
+    setEntries((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      writeEntries(next);
+      return next;
+    });
+  }
+
+  function clearEntries() {
+    setEntries([]);
+    writeEntries([]);
+  }
 
   useEffect(() => () => {
     if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
@@ -188,6 +262,10 @@ function Dashboard() {
             <ReportPreview job={job} form={form} />
           </section>
         </div>
+
+        <section className="mt-10">
+          <TimelineCard entries={entries} onDelete={deleteEntry} onClear={clearEntries} />
+        </section>
       </main>
     </div>
   );
