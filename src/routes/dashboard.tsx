@@ -58,6 +58,37 @@ type IntakeForm = {
   notes: string;
   pain_score: number;
   pain_recorded_at: string; // datetime-local value: YYYY-MM-DDTHH:mm
+  socrates: SocratesAnswers;
+};
+
+type SocratesAnswers = {
+  site: string[];
+  site_other: string;
+  onset: string;
+  cycle_link: string;
+  character: string[];
+  associated: string[];
+  radiation: string[];
+  duration: string;
+  pattern: string;
+  worse: string[];
+  better: string[];
+  nsaid_relief: string;
+};
+
+const emptySocrates: SocratesAnswers = {
+  site: [],
+  site_other: "",
+  onset: "",
+  cycle_link: "",
+  character: [],
+  associated: [],
+  radiation: [],
+  duration: "",
+  pattern: "",
+  worse: [],
+  better: [],
+  nsaid_relief: "",
 };
 
 const emptyForm: IntakeForm = {
@@ -68,6 +99,7 @@ const emptyForm: IntakeForm = {
   notes: "",
   pain_score: 0,
   pain_recorded_at: "",
+  socrates: { ...emptySocrates, site: [], character: [], associated: [], radiation: [], worse: [], better: [] },
 };
 
 type LogEntry = {
