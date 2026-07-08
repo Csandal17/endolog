@@ -28,6 +28,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { jsPDF } from "jspdf";
+import * as api from "@/services/api";
+import type { Report as ApiReport, StructuredReport } from "@/services/api";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -40,8 +42,6 @@ export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
 });
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-
 type Stage = "intake" | "normalising" | "generating" | "complete" | "error";
 
 type ReportSection = { title: string; content: string };
@@ -52,6 +52,7 @@ type JobStatus = {
   pdf_url?: string;
   error?: string;
   terms?: string[];
+  report_id?: string;
 };
 
 type IntakeForm = {
@@ -102,13 +103,14 @@ function writeEntries(next: LogEntry[]) {
 
 function Dashboard() {
   const [form, setForm] = useState<IntakeForm>(emptyForm);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockTimerRef = useRef<number | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const savedForJobRef = useRef<string | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   // Load persisted entries after mount (avoid SSR/hydration mismatch)
   useEffect(() => {
@@ -118,7 +120,7 @@ function Dashboard() {
   // When a job completes, persist an entry once.
   useEffect(() => {
     if (!job || job.status !== "complete") return;
-    const key = jobId ?? "job";
+    const key = reportId ?? "job";
     if (savedForJobRef.current === key) return;
     savedForJobRef.current = key;
     const terms = deriveTerms(job, form);
@@ -134,7 +136,7 @@ function Dashboard() {
       writeEntries(next);
       return next;
     });
-  }, [job, jobId, form]);
+  }, [job, reportId, form]);
 
   function deleteEntry(id: string) {
     setEntries((prev) => {
@@ -164,64 +166,51 @@ function Dashboard() {
     }
     setError(null);
     setSubmitting(true);
-    setJob({ status: "intake", stage_label: "Receiving intake" });
+    setReportId(null);
+    // Kick off a client-side visual walk through the three agents while the
+    // API request is in flight — the mock backend replies in < 2s but we
+    // want the user to see each stage light up.
+    animateStages(setJob, mockTimerRef);
 
     try {
-      if (!API_BASE) {
-        // Demo fallback — simulate the three-agent pipeline
-        runMockPipeline(form, setJob);
-        setJobId("demo-job");
-        setSubmitting(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+      const res = await api.processPatientIntake({
+        patient_name: form.patient_name.trim(),
+        dob: form.dob || undefined,
+        sex: form.sex || undefined,
+        clinician: form.clinician || undefined,
+        input_text: form.notes.trim(),
       });
-      if (!res.ok) throw new Error(`Intake failed (${res.status})`);
-      const data = (await res.json()) as { job_id: string };
-      setJobId(data.job_id);
+      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
+      // Fetch the persisted report so the preview renders the exact bytes
+      // that the backend stored (parity with the future FastAPI response).
+      const stored = await api.getReport(res.report_id);
+      const structured = stored.structured_data;
+      if (!structured) throw new Error("Backend did not return structured data");
+      setReportId(res.report_id);
+      setJob({
+        status: "complete",
+        stage_label: "Pipeline complete",
+        report: toLegacyReport(structured),
+        pdf_url: stored.pdf_url ?? `/api/reports/${res.report_id}/pdf`,
+        terms: structured.clinical_terms,
+        report_id: res.report_id,
+      });
+      setHistoryRefreshKey((k) => k + 1);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setJob({ status: "error", error: "Could not reach the intake service." });
+      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
+      const message = err instanceof Error ? err.message : "Could not reach the intake service.";
+      setError(message);
+      setJob({ status: "error", error: message });
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Poll status when a real jobId is set
-  useEffect(() => {
-    if (!jobId || jobId === "demo-job" || !API_BASE) return;
-    let cancelled = false;
-    let timeout: number;
-    const tick = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/jobs/${jobId}`);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = (await res.json()) as JobStatus;
-        if (cancelled) return;
-        setJob(data);
-        if (data.status !== "complete" && data.status !== "error") {
-          timeout = window.setTimeout(tick, 1500);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setJob({ status: "error", error: err instanceof Error ? err.message : "Polling failed" });
-      }
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timeout) window.clearTimeout(timeout);
-    };
-  }, [jobId]);
-
   function reset() {
     if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
     setJob(null);
-    setJobId(null);
+    setReportId(null);
     setError(null);
   }
 
@@ -272,6 +261,10 @@ function Dashboard() {
 
         <section className="mt-10">
           <TimelineCard entries={entries} onDelete={deleteEntry} onClear={clearEntries} />
+        </section>
+
+        <section className="mt-10">
+          <ReportHistoryCard refreshKey={historyRefreshKey} />
         </section>
       </main>
     </div>
