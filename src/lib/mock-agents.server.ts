@@ -14,6 +14,7 @@ export type IntakeInput = {
   sex?: string;
   clinician?: string;
   input_text: string;
+  include_audio_readback?: boolean;
 };
 
 const TERM_MATCHERS: { pattern: RegExp; term: string }[] = [
@@ -40,6 +41,58 @@ const RISK_MATCHERS: { pattern: RegExp; risk: string }[] = [
   { pattern: /woke|waking|night/i, risk: "Symptoms disrupting sleep — quality-of-life impact" },
   { pattern: /9 (year|month)|years to diagnos/i, risk: "Diagnostic delay documented in patient history" },
 ];
+
+// -------------------- SOCRATES heuristic extraction --------------------
+// Site · Onset · Character · Radiation · Associations · Time course ·
+// Exacerbating/relieving · Severity. Pure string heuristics — good enough
+// for the mock; the real backend will replace this with the LLM output.
+function extractSocrates(text: string): StructuredReport["socrates"] {
+  const t = text.toLowerCase();
+  const first = (patterns: RegExp[]): string | null => {
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return m[0].trim().replace(/\s+/g, " ");
+    }
+    return null;
+  };
+  const site = first([
+    /(left|right|lower|upper|mid)[- ](abdomen|belly|back|chest|pelvis|side)/i,
+    /(pelvic|abdominal|chest|back|head|leg|arm|joint) (pain|ache|discomfort)/i,
+  ]);
+  const onset = first([
+    /(sudden(ly)?|gradual(ly)?|since (yesterday|last night|this morning|\w+ ago)|started \w+ ago|for the (last|past) [^.,;]+)/i,
+  ]);
+  const character = first([
+    /(sharp|dull|throbbing|burning|stabbing|cramping|aching|pressure|tight(ness)?|shooting|colicky) [^.,;]{0,40}/i,
+  ]);
+  const radiation = first([
+    /(radiat\w+|spread\w+|shoots?) (to|down|into|towards?) [^.,;]+/i,
+  ]);
+  const associations = first([
+    /(with|and|also|along with) (nausea|vomiting|fever|chills|dizziness|shortness of breath|bloating|fatigue|bleeding|sweating)[^.,;]*/i,
+  ]);
+  const time_course = first([
+    /(constant|intermittent|comes and goes|worse (at night|in the morning|after eating)|lasts? [^.,;]+|every (day|week|month)|for [0-9]+ (days?|weeks?|months?|years?))/i,
+  ]);
+  const exacerbating_relieving = first([
+    /(worse (with|when|after|on)|better (with|when|after)|relieved by|eased by|triggered by) [^.,;]+/i,
+  ]);
+  const severityWord = first([/(mild|moderate|severe|excruciating|unbearable)/i]);
+  const severityScale = t.match(/(\d{1,2})\s*(?:\/|out of)\s*10/);
+  const severity = severityScale
+    ? `${severityScale[1]}/10${severityWord ? ` (${severityWord})` : ""}`
+    : severityWord;
+  return {
+    site,
+    onset,
+    character,
+    radiation,
+    associations,
+    time_course,
+    exacerbating_relieving,
+    severity,
+  };
+}
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -79,6 +132,7 @@ async function runNormalisationAgent(input: IntakeInput, normalized_text: string
   await delay(550);
   const terms = extractTerms(normalized_text);
   const risks = extractRisks(normalized_text);
+  const socrates = extractSocrates(normalized_text);
   return {
     duration_ms: Date.now() - start,
     structured: {
@@ -100,6 +154,8 @@ async function runNormalisationAgent(input: IntakeInput, normalized_text: string
         "Return here to update the record",
       ],
       clinical_terms: terms,
+      socrates,
+      audio_readback_enabled: Boolean(input.include_audio_readback),
     },
   };
 }
