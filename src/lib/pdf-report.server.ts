@@ -3,10 +3,7 @@
 import { jsPDF } from "jspdf";
 import type { StructuredReport } from "@/services/api";
 
-export function renderReportPdf(
-  report: StructuredReport,
-  opts: { audioUrl?: string } = {},
-): Uint8Array {
+export function renderReportPdf(report: StructuredReport): Uint8Array {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const margin = 48;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -139,24 +136,6 @@ export function renderReportPdf(
     heading("Extracted clinical terms");
     body(report.clinical_terms.join(", "));
     y += 6;
-  }
-
-  if (report.audio_readback_enabled && opts.audioUrl) {
-    heading("Accessibility · audio read-back");
-    body(
-      "An audio read-back of this record is available. Open the link below in a browser to listen. This is an opt-in accessibility feature.",
-    );
-    ensure(16);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(30, 90, 180);
-    const linkLines = doc.splitTextToSize(opts.audioUrl, maxWidth) as string[];
-    for (const line of linkLines) {
-      ensure(14);
-      doc.textWithLink(line, margin, y, { url: opts.audioUrl });
-      y += 14;
-    }
-    doc.setTextColor(40);
   }
 
   const buffer = doc.output("arraybuffer");
