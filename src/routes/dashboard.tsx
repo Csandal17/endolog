@@ -12,6 +12,8 @@ import {
   Stethoscope,
   UserRound,
   AlertCircle,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -42,6 +44,7 @@ type JobStatus = {
   report?: { patient?: Record<string, string>; sections: ReportSection[] };
   pdf_url?: string;
   error?: string;
+  terms?: string[];
 };
 
 type IntakeForm = {
@@ -60,6 +63,36 @@ const emptyForm: IntakeForm = {
   notes: "",
 };
 
+type LogEntry = {
+  id: string;
+  submittedAt: string; // ISO
+  patientName: string;
+  notesExcerpt: string;
+  terms: string[];
+};
+
+const ENTRIES_KEY = "maai:entries:v1";
+
+function readEntries(): LogEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(ENTRIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as LogEntry[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeEntries(next: LogEntry[]) {
+  try {
+    window.localStorage.setItem(ENTRIES_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / privacy mode */
+  }
+}
+
 function Dashboard() {
   const [form, setForm] = useState<IntakeForm>(emptyForm);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -67,6 +100,47 @@ function Dashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockTimerRef = useRef<number | null>(null);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const savedForJobRef = useRef<string | null>(null);
+
+  // Load persisted entries after mount (avoid SSR/hydration mismatch)
+  useEffect(() => {
+    setEntries(readEntries());
+  }, []);
+
+  // When a job completes, persist an entry once.
+  useEffect(() => {
+    if (!job || job.status !== "complete") return;
+    const key = jobId ?? "job";
+    if (savedForJobRef.current === key) return;
+    savedForJobRef.current = key;
+    const terms = deriveTerms(job, form);
+    const entry: LogEntry = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      submittedAt: new Date().toISOString(),
+      patientName: form.patient_name || "You",
+      notesExcerpt: (form.notes || "").trim().slice(0, 220),
+      terms,
+    };
+    setEntries((prev) => {
+      const next = [entry, ...prev].slice(0, 100);
+      writeEntries(next);
+      return next;
+    });
+  }, [job, jobId, form]);
+
+  function deleteEntry(id: string) {
+    setEntries((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      writeEntries(next);
+      return next;
+    });
+  }
+
+  function clearEntries() {
+    setEntries([]);
+    writeEntries([]);
+  }
 
   useEffect(() => () => {
     if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
@@ -188,6 +262,10 @@ function Dashboard() {
             <ReportPreview job={job} form={form} />
           </section>
         </div>
+
+        <section className="mt-10">
+          <TimelineCard entries={entries} onDelete={deleteEntry} onClear={clearEntries} />
+        </section>
       </main>
     </div>
   );
@@ -658,4 +736,211 @@ function buildMockReport(form: IntakeForm) {
       },
     ],
   };
+}
+
+// ---------- Timeline ----------
+
+const KEYWORD_TERMS: { pattern: RegExp; term: string }[] = [
+  { pattern: /cramp|period pain|menstrual pain/i, term: "Dysmenorrhea" },
+  { pattern: /pelvi|lower abdomen|low(er)? belly/i, term: "Pelvic pain" },
+  { pattern: /left side|left-sided|left flank/i, term: "Left-sided pain" },
+  { pattern: /right side|right-sided|right flank/i, term: "Right-sided pain" },
+  { pattern: /bloat|swollen|distend/i, term: "Bloating" },
+  { pattern: /nausea|sick to stomach|vomit/i, term: "Nausea" },
+  { pattern: /fatigue|exhaust|drained|tired/i, term: "Fatigue" },
+  { pattern: /heavy bleed|clots|flooding/i, term: "Heavy menstrual bleeding" },
+  { pattern: /spotting|between periods|irregular bleed/i, term: "Intermenstrual bleeding" },
+  { pattern: /pain during sex|dyspareunia|painful intercourse/i, term: "Dyspareunia" },
+  { pattern: /pain(ful)? (when )?(peeing|urinating)|burning wee/i, term: "Dysuria" },
+  { pattern: /pain(ful)? (during|when)? ?(bowel|poo|stool|defec)/i, term: "Dyschezia" },
+  { pattern: /woke|waking|night sweat|insomnia/i, term: "Sleep disruption" },
+  { pattern: /headache|migraine/i, term: "Headache" },
+  { pattern: /back pain|lower back/i, term: "Lower back pain" },
+  { pattern: /leg pain|radiat/i, term: "Radiating leg pain" },
+  { pattern: /mood|anxious|low mood|depress/i, term: "Mood change" },
+];
+
+function deriveTerms(job: JobStatus, form: IntakeForm): string[] {
+  if (job.terms && job.terms.length) return dedupe(job.terms).slice(0, 6);
+  const notes = form.notes || "";
+  const matched = KEYWORD_TERMS.filter(({ pattern }) => pattern.test(notes)).map((k) => k.term);
+  if (matched.length) return dedupe(matched).slice(0, 6);
+  // Fall back to report section titles if available (real backend)
+  if (job.report?.sections?.length) {
+    return dedupe(job.report.sections.map((s) => s.title)).slice(0, 6);
+  }
+  return ["Symptom logged"];
+}
+
+function dedupe<T>(arr: T[]) {
+  return Array.from(new Set(arr));
+}
+
+function TimelineCard({
+  entries,
+  onDelete,
+  onClear,
+}: {
+  entries: LogEntry[];
+  onDelete: (id: string) => void;
+  onClear: () => void;
+}) {
+  const empty = entries.length === 0;
+  const topTerms = computeTopTerms(entries).slice(0, 6);
+
+  return (
+    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-sage/40 text-charcoal">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl leading-none tracking-tight">Pattern over time</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {empty
+                ? "Your logged entries and mapped clinical terms will appear here."
+                : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} · saved on this device`}
+            </p>
+          </div>
+        </div>
+        {!empty && (
+          <button
+            onClick={onClear}
+            className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {!empty && topTerms.length > 0 && (
+        <div className="mt-6">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-warm-grey">
+            Recurring terms
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {topTerms.map(({ term, count }) => (
+              <span
+                key={term}
+                className="inline-flex items-center gap-1.5 rounded-full bg-pink/25 px-3 py-1 text-xs font-medium text-charcoal"
+              >
+                {term}
+                <span className="rounded-full bg-charcoal/10 px-1.5 text-[10px]">{count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8">
+        {empty ? (
+          <TimelineEmpty />
+        ) : (
+          <ol className="relative space-y-6 border-l border-stone/60 pl-6">
+            <AnimatePresence initial={false}>
+              {entries.map((entry) => (
+                <TimelineEntry key={entry.id} entry={entry} onDelete={onDelete} />
+              ))}
+            </AnimatePresence>
+          </ol>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function TimelineEmpty() {
+  return (
+    <div className="rounded-2xl border border-dashed border-border/70 bg-parchment/60 py-12 text-center">
+      <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-powder/40 text-charcoal">
+        <Clock className="h-4 w-4" />
+      </div>
+      <p className="mt-4 font-serif text-lg text-charcoal">No entries yet</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Submit an intake above — it will appear here with the clinical terms Maai extracted.
+      </p>
+    </div>
+  );
+}
+
+function TimelineEntry({
+  entry,
+  onDelete,
+}: {
+  entry: LogEntry;
+  onDelete: (id: string) => void;
+}) {
+  const date = new Date(entry.submittedAt);
+  return (
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.25 }}
+      className="relative"
+    >
+      <span
+        aria-hidden
+        className="absolute -left-[31px] top-1.5 grid h-4 w-4 place-items-center rounded-full border-2 border-background bg-primary"
+      />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex items-baseline gap-3">
+          <span className="font-serif text-base text-charcoal">{formatDate(date)}</span>
+          <span className="text-xs text-warm-grey">{formatTime(date)}</span>
+        </div>
+        <button
+          onClick={() => onDelete(entry.id)}
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
+          aria-label="Delete entry"
+        >
+          <Trash2 className="h-3 w-3" />
+          Remove
+        </button>
+      </div>
+      {entry.notesExcerpt && (
+        <p className="mt-2 rounded-2xl border border-border/60 bg-parchment px-4 py-3 text-sm leading-relaxed text-charcoal">
+          &ldquo;{entry.notesExcerpt}
+          {entry.notesExcerpt.length >= 220 ? "…" : ""}&rdquo;
+        </p>
+      )}
+      {entry.terms.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {entry.terms.map((t, i) => (
+            <span
+              key={`${entry.id}-${t}`}
+              className="rounded-full px-3 py-1 text-xs font-medium text-charcoal"
+              style={{
+                background: `color-mix(in oklab, var(--color-${TINT_ROTATION[i % TINT_ROTATION.length]}) 45%, transparent)`,
+              }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+    </motion.li>
+  );
+}
+
+const TINT_ROTATION = ["pink", "powder", "butter", "sage"] as const;
+
+function computeTopTerms(entries: LogEntry[]): { term: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const e of entries) {
+    for (const term of e.terms) {
+      counts.set(term, (counts.get(term) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .map(([term, count]) => ({ term, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function formatDate(d: Date) {
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+function formatTime(d: Date) {
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
