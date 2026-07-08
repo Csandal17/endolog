@@ -1388,6 +1388,96 @@ function VoiceControls({
         Read-back is optional — a confirmation step before you hand it over.
       </span>
 
+      {/* Microphone permission banner */}
+      {(micPermission === "denied" ||
+        micPermission === "prompt" ||
+        micPermission === "unsupported") && (
+        <div
+          className="basis-full rounded-2xl border border-border/60 bg-parchment/70 px-3 py-2 text-[11px] text-warm-grey"
+          role="note"
+        >
+          {micPermission === "denied" ? (
+            <span>
+              Microphone access is blocked. Open your browser's site settings for this page,
+              set microphone to <strong>Allow</strong>, then reload.
+            </span>
+          ) : micPermission === "unsupported" ? (
+            <span>
+              Your browser doesn't support microphone input. You can still type your notes and
+              use read-back.
+            </span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Maai needs microphone access to dictate.</span>
+              <button
+                type="button"
+                onClick={requestMicAccess}
+                className="inline-flex items-center gap-1 rounded-full bg-pink/40 px-2.5 py-1 text-[11px] font-medium text-charcoal hover:bg-pink/60"
+              >
+                <Mic className="h-3 w-3" />
+                Allow microphone
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Playback progress + times */}
+      {hasAudio && duration > 0 && (
+        <div className="basis-full">
+          <div
+            role="slider"
+            tabIndex={0}
+            aria-label="Read-back progress"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(current)}
+            aria-valuetext={`${formatDuration(current)} of ${formatDuration(duration)}, ${
+              Math.round((current / duration) * 100)
+            } percent`}
+            onKeyDown={(e) => {
+              const audio = audioRef.current;
+              if (!audio) return;
+              if (e.key === "ArrowRight") {
+                audio.currentTime = Math.min(duration, audio.currentTime + 5);
+                e.preventDefault();
+              } else if (e.key === "ArrowLeft") {
+                audio.currentTime = Math.max(0, audio.currentTime - 5);
+                e.preventDefault();
+              } else if (e.key === "Home") {
+                audio.currentTime = 0;
+                e.preventDefault();
+              } else if (e.key === "End") {
+                audio.currentTime = duration;
+                e.preventDefault();
+              } else if (e.key === " " || e.key === "Enter") {
+                playOrPause();
+                e.preventDefault();
+              }
+            }}
+            onClick={(e) => {
+              const audio = audioRef.current;
+              if (!audio || !duration) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+              audio.currentTime = pct * duration;
+              setCurrent(audio.currentTime);
+              setStatus(`Seeked to ${formatDuration(audio.currentTime)}.`);
+            }}
+            className="group relative h-2 w-full cursor-pointer overflow-hidden rounded-full bg-stone/50 focus:outline-none focus:ring-2 focus:ring-primary/60"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-150"
+              style={{ width: `${Math.min(100, (current / duration) * 100)}%` }}
+            />
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[11px] tabular-nums text-warm-grey">
+            <span aria-hidden>{formatDuration(current)}</span>
+            <span aria-hidden>−{formatDuration(Math.max(0, duration - current))}</span>
+          </div>
+        </div>
+      )}
+
       {/* Polite live region for screen readers. Visually hidden but announced. */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {status}
@@ -1400,4 +1490,11 @@ function VoiceControls({
       )}
     </div>
   );
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
