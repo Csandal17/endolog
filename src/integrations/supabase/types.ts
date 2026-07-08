@@ -14,7 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      patients: {
+        Row: {
+          created_at: string
+          id: string
+          input_text: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_text: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_text?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          id: string
+          patient_id: string
+          pdf_url: string | null
+          status: string
+          structured_data: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          patient_id: string
+          pdf_url?: string | null
+          status?: string
+          structured_data?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          patient_id?: string
+          pdf_url?: string | null
+          status?: string
+          structured_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
