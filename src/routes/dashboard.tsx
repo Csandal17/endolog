@@ -360,14 +360,28 @@ function IntakeCard({
           </Field>
         </div>
 
-        <Field label="Clinical notes" required hint="Anything relevant — symptoms, history, meds, observations.">
-          <Textarea
-            value={form.notes}
-            onChange={update("notes")}
-            placeholder="e.g. 54yo presenting with 3-day intermittent chest tightness, worse on exertion. Hx of hypertension, on amlodipine 5mg. BP 148/92, HR 88 regular. No radiation, no diaphoresis…"
-            rows={9}
-            className="resize-none"
-          />
+        <Field
+          label="What have you been experiencing?"
+          required
+          hint="In your own words, in any language. Speak it or type it — Maai will map it to clinical terms."
+        >
+          <div className="space-y-2">
+            <Textarea
+              value={form.notes}
+              onChange={update("notes")}
+              placeholder="e.g. sharp cramping on my left side for the last three days, worse at night, waking me up. Bloated most afternoons…"
+              rows={9}
+              className="resize-none"
+            />
+            <VoiceControls
+              text={form.notes}
+              onTranscript={(t) =>
+                update("notes")({
+                  target: { value: form.notes ? `${form.notes.trim()} ${t}`.trim() : t },
+                } as unknown as React.ChangeEvent<HTMLTextAreaElement>)
+              }
+            />
+          </div>
         </Field>
 
         {error && (
