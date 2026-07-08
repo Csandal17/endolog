@@ -14,6 +14,10 @@ import {
   AlertCircle,
   Clock,
   Trash2,
+  Mic,
+  Square,
+  Volume2,
+  Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
