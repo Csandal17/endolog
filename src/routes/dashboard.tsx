@@ -1436,3 +1436,293 @@ function StatusPill({ status }: { status: ApiReport["status"] }) {
     </span>
   );
 }
+
+// ============================================================
+// SOCRATES questionnaire
+// ============================================================
+
+const SOCRATES_SECTIONS = {
+  site: [
+    "Pelvis",
+    "Lower back",
+    "Lower abdomen (left)",
+    "Lower abdomen (right)",
+    "Legs",
+    "Rectum/back passage",
+  ],
+  onset: ["Sudden — came on quickly", "Gradual — built up slowly"],
+  cycle_link: [
+    "In the days before my period",
+    "During my period",
+    "In the days after my period",
+    "Around ovulation (mid-cycle)",
+    "No link to my cycle",
+    "I'm not sure",
+  ],
+  character: ["Cramping", "Sharp", "Stabbing", "Burning", "Dull ache", "Throbbing"],
+  associated: [
+    "Nausea",
+    "Bloating",
+    "Fatigue",
+    "Dizziness",
+    "Pain when passing a bowel motion",
+    "Pain when passing urine",
+    "Heavy bleeding",
+  ],
+  radiation: [
+    "Lower back",
+    "Down the legs",
+    "Towards the rectum/back passage",
+    "Towards the vagina",
+    "Doesn't spread anywhere else",
+  ],
+  duration: ["Minutes", "Hours", "Days", "Constant, doesn't go away"],
+  pattern: ["It's constant", "It comes and goes"],
+  worse: ["Moving around", "Sex", "Bowel movements", "Passing urine", "Exercise"],
+  better: ["Rest", "Heat (e.g. hot water bottle)", "Painkillers (NSAIDs, e.g. ibuprofen)", "Hormonal contraception"],
+  nsaid_relief: ["Haven't tried NSAIDs", "No relief at all", "Some relief, but pain continues", "Fully relieved"],
+} as const;
+
+function formatSocrates(a: SocratesAnswers): string {
+  const lines: string[] = [];
+  const push = (label: string, value: string | string[]) => {
+    const v = Array.isArray(value) ? value.join(", ") : value;
+    if (v && v.trim()) lines.push(`- ${label}: ${v}`);
+  };
+  const siteAll = [...a.site, ...(a.site_other.trim() ? [a.site_other.trim()] : [])];
+  push("Site", siteAll);
+  push("Onset", a.onset);
+  push("Cycle link", a.cycle_link);
+  push("Character", a.character);
+  push("Associated symptoms", a.associated);
+  push("Radiation", a.radiation);
+  push("Duration", a.duration);
+  push("Pattern", a.pattern);
+  push("Worse with", a.worse);
+  push("Better with", a.better);
+  push("NSAID response", a.nsaid_relief);
+  return lines.length ? `SOCRATES:\n${lines.join("\n")}` : "";
+}
+
+function SocratesFields({
+  answers,
+  onChange,
+}: {
+  answers: SocratesAnswers;
+  onChange: (patch: Partial<SocratesAnswers>) => void;
+}) {
+  const toggle = (key: keyof SocratesAnswers, value: string) => {
+    const arr = answers[key] as string[];
+    const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+    onChange({ [key]: next } as Partial<SocratesAnswers>);
+  };
+  const set = (key: keyof SocratesAnswers, value: string) => {
+    // toggle-off if same option clicked again
+    const current = answers[key] as string;
+    onChange({ [key]: current === value ? "" : value } as Partial<SocratesAnswers>);
+  };
+
+  return (
+    <div className="space-y-6 rounded-2xl border border-border/60 bg-muted/30 p-5">
+      <div>
+        <h3 className="font-serif text-xl leading-none tracking-tight">Log a symptom</h3>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Answer as best you can — you can skip anything that doesn't apply.
+        </p>
+      </div>
+
+      <SocratesGroup title="Site — where is the pain?">
+        {SOCRATES_SECTIONS.site.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.site.includes(opt)}
+            onClick={() => toggle("site", opt)}
+          />
+        ))}
+        <div className="pt-2">
+          <Label className="text-[11px] font-medium uppercase tracking-wide text-warm-grey">
+            Other site (optional)
+          </Label>
+          <Input
+            className="mt-1.5 rounded-full bg-background"
+            value={answers.site_other}
+            onChange={(e) => onChange({ site_other: e.target.value })}
+            placeholder="e.g. shoulder tip pain"
+          />
+        </div>
+      </SocratesGroup>
+
+      <SocratesGroup title="Onset — how did it start?">
+        {SOCRATES_SECTIONS.onset.map((opt) => (
+          <PillOption
+            key={opt}
+            type="radio"
+            label={opt}
+            selected={answers.onset === opt}
+            onClick={() => set("onset", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Onset — link to your cycle?">
+        {SOCRATES_SECTIONS.cycle_link.map((opt) => (
+          <PillOption
+            key={opt}
+            type="radio"
+            label={opt}
+            selected={answers.cycle_link === opt}
+            onClick={() => set("cycle_link", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Character — what does it feel like?">
+        {SOCRATES_SECTIONS.character.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.character.includes(opt)}
+            onClick={() => toggle("character", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Anything else alongside the pain?">
+        {SOCRATES_SECTIONS.associated.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.associated.includes(opt)}
+            onClick={() => toggle("associated", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Radiation — where does it spread to?">
+        {SOCRATES_SECTIONS.radiation.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.radiation.includes(opt)}
+            onClick={() => toggle("radiation", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Timing — how long does it last?">
+        {SOCRATES_SECTIONS.duration.map((opt) => (
+          <PillOption
+            key={opt}
+            type="radio"
+            label={opt}
+            selected={answers.duration === opt}
+            onClick={() => set("duration", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="Timing — pattern">
+        {SOCRATES_SECTIONS.pattern.map((opt) => (
+          <PillOption
+            key={opt}
+            type="radio"
+            label={opt}
+            selected={answers.pattern === opt}
+            onClick={() => set("pattern", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="What makes it worse?">
+        {SOCRATES_SECTIONS.worse.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.worse.includes(opt)}
+            onClick={() => toggle("worse", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="What makes it better?">
+        {SOCRATES_SECTIONS.better.map((opt) => (
+          <PillOption
+            key={opt}
+            type="check"
+            label={opt}
+            selected={answers.better.includes(opt)}
+            onClick={() => toggle("better", opt)}
+          />
+        ))}
+      </SocratesGroup>
+
+      <SocratesGroup title="If you've taken NSAIDs (e.g. ibuprofen), did they help?">
+        {SOCRATES_SECTIONS.nsaid_relief.map((opt) => (
+          <PillOption
+            key={opt}
+            type="radio"
+            label={opt}
+            selected={answers.nsaid_relief === opt}
+            onClick={() => set("nsaid_relief", opt)}
+          />
+        ))}
+      </SocratesGroup>
+    </div>
+  );
+}
+
+function SocratesGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-charcoal">{title}</h4>
+      <div className="mt-2.5 space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function PillOption({
+  type,
+  label,
+  selected,
+  onClick,
+}: {
+  type: "check" | "radio";
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role={type === "radio" ? "radio" : "checkbox"}
+      aria-checked={selected}
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-full border px-4 py-2.5 text-left text-sm transition ${
+        selected
+          ? "border-primary bg-pink/30 text-charcoal"
+          : "border-border/60 bg-background text-charcoal hover:border-primary/40"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`grid h-5 w-5 shrink-0 place-items-center ${
+          type === "radio" ? "rounded-full" : "rounded"
+        } border ${selected ? "border-primary bg-background" : "border-warm-grey/60 bg-background"}`}
+      >
+        {selected &&
+          (type === "radio" ? (
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          ) : (
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+          ))}
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
