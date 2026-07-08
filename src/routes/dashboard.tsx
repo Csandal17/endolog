@@ -14,12 +14,6 @@ import {
   AlertCircle,
   Clock,
   Trash2,
-  Mic,
-  Square,
-  Volume2,
-  Pause,
-  Play,
-  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,7 +55,6 @@ type IntakeForm = {
   sex: string;
   clinician: string;
   notes: string;
-  include_audio_readback: boolean;
 };
 
 const emptyForm: IntakeForm = {
@@ -70,7 +63,6 @@ const emptyForm: IntakeForm = {
   sex: "",
   clinician: "",
   notes: "",
-  include_audio_readback: false,
 };
 
 type LogEntry = {
@@ -181,7 +173,6 @@ function Dashboard() {
         sex: form.sex || undefined,
         clinician: form.clinician || undefined,
         input_text: form.notes.trim(),
-        include_audio_readback: form.include_audio_readback,
       });
       if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
       // Fetch the persisted report so the preview renders the exact bytes
@@ -243,7 +234,6 @@ function Dashboard() {
                     submitting={submitting}
                     error={error ?? job?.error ?? null}
                     onReset={() => setForm(emptyForm)}
-                    onToggleAudio={(v) => setForm((f) => ({ ...f, include_audio_readback: v }))}
                   />
                 </motion.div>
               ) : (
@@ -324,7 +314,6 @@ function IntakeCard({
   submitting,
   error,
   onReset,
-  onToggleAudio,
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -332,7 +321,6 @@ function IntakeCard({
   submitting: boolean;
   error: string | null;
   onReset: () => void;
-  onToggleAudio: (value: boolean) => void;
 }) {
   return (
     <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
