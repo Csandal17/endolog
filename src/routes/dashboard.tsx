@@ -389,6 +389,7 @@ function Header() {
 function IntakeCard({
   form,
   update,
+  setSocrates,
   onPainScore,
   onPainDateTime,
   onPainDateTimeNow,
@@ -399,6 +400,7 @@ function IntakeCard({
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  setSocrates: (patch: Partial<SocratesAnswers>) => void;
   onPainScore: (n: number) => void;
   onPainDateTime: (v: string) => void;
   onPainDateTimeNow: () => void;
@@ -441,6 +443,8 @@ function IntakeCard({
           onDateTime={onPainDateTime}
           onNow={onPainDateTimeNow}
         />
+
+        <SocratesFields answers={form.socrates} onChange={setSocrates} />
 
         <Field
           label="What have you been experiencing?"
