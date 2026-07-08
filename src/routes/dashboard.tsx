@@ -962,3 +962,213 @@ function formatDate(d: Date) {
 function formatTime(d: Date) {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
+
+// ---------- Voice controls (ElevenLabs STT + TTS) ----------
+
+function VoiceControls({
+  text,
+  onTranscript,
+}: {
+  text: string;
+  onTranscript: (t: string) => void;
+}) {
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  async function startRecording() {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mime = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const type = rec.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
+        if (blob.size < 1024) {
+          setError("That recording was too short — please try again.");
+          return;
+        }
+        await transcribe(blob, type);
+      };
+      rec.start();
+      recorderRef.current = rec;
+      setRecording(true);
+    } catch (err) {
+      console.error(err);
+      setError("Microphone access is needed to dictate.");
+    }
+  }
+
+  function stopRecording() {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setRecording(false);
+  }
+
+  async function transcribe(blob: Blob, mime: string) {
+    setTranscribing(true);
+    setError(null);
+    try {
+      const ext = mime.includes("mp4") ? "mp4" : mime.includes("mpeg") ? "mp3" : "webm";
+      const fd = new FormData();
+      fd.append("file", blob, `recording.${ext}`);
+      const res = await fetch("/api/stt", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await res.text().catch(() => `Transcription failed (${res.status})`));
+      const data = (await res.json()) as { text: string };
+      const t = (data.text || "").trim();
+      if (!t) {
+        setError("No speech detected — please try again.");
+        return;
+      }
+      onTranscript(t);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Could not transcribe audio.");
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  async function readBack() {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setError("Write or dictate something first, then Maai can read it back.");
+      return;
+    }
+    // Toggle stop if currently speaking.
+    if (speaking && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setSpeaking(false);
+      return;
+    }
+    setError(null);
+    setLoadingAudio(true);
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed.slice(0, 5000) }),
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `Read-back failed (${res.status})`));
+      const blob = await res.blob();
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setSpeaking(false);
+      audio.onpause = () => setSpeaking(false);
+      audio.onplay = () => setSpeaking(true);
+      await audio.play();
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Could not read the record back.");
+    } finally {
+      setLoadingAudio(false);
+    }
+  }
+
+  const busy = recording || transcribing;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <button
+        type="button"
+        onClick={recording ? stopRecording : startRecording}
+        disabled={transcribing}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+          recording
+            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+            : "bg-pink/25 text-charcoal hover:bg-pink/40"
+        } disabled:opacity-60`}
+        aria-pressed={recording}
+        aria-label={recording ? "Stop recording" : "Dictate with your voice"}
+      >
+        {transcribing ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Transcribing…
+          </>
+        ) : recording ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-foreground" />
+            </span>
+            <Square className="h-3.5 w-3.5" />
+            Stop & transcribe
+          </>
+        ) : (
+          <>
+            <Mic className="h-3.5 w-3.5" />
+            Dictate in your language
+          </>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={readBack}
+        disabled={busy || loadingAudio}
+        className="inline-flex items-center gap-1.5 rounded-full bg-powder/50 px-3.5 py-1.5 text-xs font-medium text-charcoal hover:bg-powder/70 disabled:opacity-60"
+        aria-label={speaking ? "Stop read-back" : "Listen to your record"}
+      >
+        {loadingAudio ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Preparing…
+          </>
+        ) : speaking ? (
+          <>
+            <Pause className="h-3.5 w-3.5" />
+            Stop read-back
+          </>
+        ) : (
+          <>
+            <Volume2 className="h-3.5 w-3.5" />
+            Listen to your record
+          </>
+        )}
+      </button>
+
+      <span className="text-[11px] text-muted-foreground">
+        Read-back is optional — a confirmation step before you hand it over.
+      </span>
+
+      {error && (
+        <div className="basis-full text-[11px] text-destructive" role="alert">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
