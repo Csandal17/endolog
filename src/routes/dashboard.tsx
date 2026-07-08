@@ -373,8 +373,7 @@ function IntakeCard({
           <UserRound className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-serif text-2xl leading-none tracking-tight">Patient intake</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Agent 1 · free-text collection</p>
+          <h2 className="font-serif text-2xl leading-none tracking-tight">My Pain Profile</h2>
         </div>
       </div>
 
