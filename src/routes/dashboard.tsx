@@ -18,6 +18,8 @@ import {
   Square,
   Volume2,
   Pause,
+  Play,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
