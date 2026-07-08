@@ -15,6 +15,7 @@ import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiProcessRouteImport } from './routes/api/process'
 import { Route as ApiReportsIndexRouteImport } from './routes/api/reports/index'
+import { Route as ApiReportsIdRouteImport } from './routes/api/reports/$id'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -46,6 +47,11 @@ const ApiReportsIndexRoute = ApiReportsIndexRouteImport.update({
   path: '/api/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReportsIdRoute = ApiReportsIdRouteImport.update({
+  id: '/api/reports/$id',
+  path: '/api/reports/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/reports/$id': typeof ApiReportsIdRoute
   '/api/reports/': typeof ApiReportsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/reports/$id': typeof ApiReportsIdRoute
   '/api/reports': typeof ApiReportsIndexRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/reports/$id': typeof ApiReportsIdRoute
   '/api/reports/': typeof ApiReportsIndexRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/api/process'
     | '/api/stt'
     | '/api/tts'
+    | '/api/reports/$id'
     | '/api/reports/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/api/process'
     | '/api/stt'
     | '/api/tts'
+    | '/api/reports/$id'
     | '/api/reports'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/api/process'
     | '/api/stt'
     | '/api/tts'
+    | '/api/reports/$id'
     | '/api/reports/'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   ApiProcessRoute: typeof ApiProcessRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiReportsIdRoute: typeof ApiReportsIdRoute
   ApiReportsIndexRoute: typeof ApiReportsIndexRoute
 }
 
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReportsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reports/$id': {
+      id: '/api/reports/$id'
+      path: '/api/reports/$id'
+      fullPath: '/api/reports/$id'
+      preLoaderRoute: typeof ApiReportsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProcessRoute: ApiProcessRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiReportsIdRoute: ApiReportsIdRoute,
   ApiReportsIndexRoute: ApiReportsIndexRoute,
 }
 export const routeTree = rootRouteImport
