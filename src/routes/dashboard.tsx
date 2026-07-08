@@ -1058,6 +1058,7 @@ function VoiceControls({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      setMicPermission("granted");
       const mime = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4")
@@ -1086,8 +1087,39 @@ function VoiceControls({
       setStatus("Recording. Speak in your own language.");
     } catch (err) {
       console.error(err);
-      setError("Microphone access is needed to dictate.");
-      setStatus("Microphone access denied.");
+      const denied =
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "SecurityError");
+      if (denied) setMicPermission("denied");
+      setError(
+        denied
+          ? "Microphone access is blocked. Enable it in your browser's site settings for this page, then try again."
+          : "Microphone unavailable. Check that a mic is connected.",
+      );
+      setStatus(denied ? "Microphone access denied." : "Microphone unavailable.");
+    }
+  }
+
+  async function requestMicAccess() {
+    setError(null);
+    setStatus("Requesting microphone access…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately stop — this call is only to trigger the permission prompt.
+      stream.getTracks().forEach((t) => t.stop());
+      setMicPermission("granted");
+      setStatus("Microphone access granted. You can now dictate.");
+    } catch (err) {
+      const denied =
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "SecurityError");
+      if (denied) setMicPermission("denied");
+      setError(
+        denied
+          ? "Microphone access is blocked. Enable it in your browser's site settings for this page, then try again."
+          : "Microphone unavailable. Check that a mic is connected.",
+      );
+      setStatus(denied ? "Microphone access denied." : "Microphone unavailable.");
     }
   }
 
