@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { jsPDF } from "jspdf";
 import * as api from "@/services/api";
 import type { Report as ApiReport, StructuredReport } from "@/services/api";
@@ -55,6 +56,8 @@ type IntakeForm = {
   sex: string;
   clinician: string;
   notes: string;
+  pain_score: number;
+  pain_recorded_at: string; // datetime-local value: YYYY-MM-DDTHH:mm
 };
 
 const emptyForm: IntakeForm = {
@@ -63,6 +66,8 @@ const emptyForm: IntakeForm = {
   sex: "",
   clinician: "",
   notes: "",
+  pain_score: 0,
+  pain_recorded_at: "",
 };
 
 type LogEntry = {
