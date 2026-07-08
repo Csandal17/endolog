@@ -720,9 +720,9 @@ function ReportPreview({
           </div>
           <div>
             <h2 className="font-serif text-2xl leading-none tracking-tight">Report preview</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {done ? "Structured output from agent 3" : "Populates as the pipeline runs"}
-            </p>
+            {done && (
+              <p className="mt-1 text-xs text-muted-foreground">Structured output from agent 3</p>
+            )}
           </div>
         </div>
         {done && <DownloadButton job={job} reportId={reportId} />}
