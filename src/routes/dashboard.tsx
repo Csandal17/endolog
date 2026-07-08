@@ -18,6 +18,8 @@ import {
   Square,
   Volume2,
   Pause,
+  Play,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -974,15 +976,18 @@ function VoiceControls({
 }) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
+  const [playback, setPlayback] = useState<"idle" | "playing" | "paused">("idle");
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rate, setRate] = useState(1);
+  const [status, setStatus] = useState("");
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const cachedForRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -991,6 +996,26 @@ function VoiceControls({
       audioRef.current?.pause();
     };
   }, []);
+
+  // Invalidate cached audio when the text changes so a re-generated read-back
+  // matches the latest notes.
+  useEffect(() => {
+    if (cachedForRef.current !== null && cachedForRef.current !== text.trim()) {
+      stopPlayback();
+      cachedForRef.current = null;
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+      audioRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  // Keep the live playback rate in sync with the selector.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = rate;
+  }, [rate]);
 
   async function startRecording() {
     setError(null);
@@ -1014,6 +1039,7 @@ function VoiceControls({
         const blob = new Blob(chunksRef.current, { type });
         if (blob.size < 1024) {
           setError("That recording was too short — please try again.");
+          setStatus("Recording was too short.");
           return;
         }
         await transcribe(blob, type);
@@ -1021,9 +1047,11 @@ function VoiceControls({
       rec.start();
       recorderRef.current = rec;
       setRecording(true);
+      setStatus("Recording. Speak in your own language.");
     } catch (err) {
       console.error(err);
       setError("Microphone access is needed to dictate.");
+      setStatus("Microphone access denied.");
     }
   }
 
@@ -1031,6 +1059,7 @@ function VoiceControls({
     recorderRef.current?.stop();
     recorderRef.current = null;
     setRecording(false);
+    setStatus("Transcribing your recording.");
   }
 
   async function transcribe(blob: Blob, mime: string) {
@@ -1046,32 +1075,70 @@ function VoiceControls({
       const t = (data.text || "").trim();
       if (!t) {
         setError("No speech detected — please try again.");
+        setStatus("No speech detected.");
         return;
       }
       onTranscript(t);
+      setStatus("Transcript added to your notes.");
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Could not transcribe audio.");
+      setStatus("Transcription failed.");
     } finally {
       setTranscribing(false);
     }
   }
 
-  async function readBack() {
+  function stopPlayback() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setPlayback("idle");
+  }
+
+  async function playOrPause() {
     const trimmed = text.trim();
     if (!trimmed) {
       setError("Write or dictate something first, then Maai can read it back.");
+      setStatus("Nothing to read back yet.");
       return;
     }
-    // Toggle stop if currently speaking.
-    if (speaking && audioRef.current) {
+
+    // Pause an in-flight playback.
+    if (playback === "playing" && audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setSpeaking(false);
+      setPlayback("paused");
+      setStatus("Read-back paused.");
       return;
     }
+
+    // Resume from a paused position without re-generating audio.
+    if (
+      playback === "paused" &&
+      audioRef.current &&
+      cachedForRef.current === trimmed
+    ) {
+      audioRef.current.playbackRate = rate;
+      await audioRef.current.play();
+      setPlayback("playing");
+      setStatus("Read-back resumed.");
+      return;
+    }
+
+    // Reuse cached audio (e.g. after stop) if the text hasn't changed.
+    if (audioRef.current && cachedForRef.current === trimmed) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.playbackRate = rate;
+      await audioRef.current.play();
+      setPlayback("playing");
+      setStatus("Playing read-back.");
+      return;
+    }
+
     setError(null);
     setLoadingAudio(true);
+    setStatus("Preparing read-back.");
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
@@ -1084,20 +1151,36 @@ function VoiceControls({
       const url = URL.createObjectURL(blob);
       audioUrlRef.current = url;
       const audio = new Audio(url);
+      audio.playbackRate = rate;
+      audio.onplay = () => {
+        setPlayback("playing");
+      };
+      audio.onpause = () => {
+        // Distinguish pause from natural end via currentTime + duration.
+        if (audio.ended) return;
+        setPlayback((p) => (p === "playing" ? "paused" : p));
+      };
+      audio.onended = () => {
+        setPlayback("idle");
+        setStatus("Read-back finished.");
+      };
       audioRef.current = audio;
-      audio.onended = () => setSpeaking(false);
-      audio.onpause = () => setSpeaking(false);
-      audio.onplay = () => setSpeaking(true);
+      cachedForRef.current = trimmed;
       await audio.play();
+      setStatus("Playing read-back.");
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Could not read the record back.");
+      setStatus("Read-back failed.");
     } finally {
       setLoadingAudio(false);
     }
   }
 
   const busy = recording || transcribing;
+  const playing = playback === "playing";
+  const paused = playback === "paused";
+  const hasAudio = playing || paused;
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1135,34 +1218,93 @@ function VoiceControls({
         )}
       </button>
 
-      <button
-        type="button"
-        onClick={readBack}
-        disabled={busy || loadingAudio}
-        className="inline-flex items-center gap-1.5 rounded-full bg-powder/50 px-3.5 py-1.5 text-xs font-medium text-charcoal hover:bg-powder/70 disabled:opacity-60"
-        aria-label={speaking ? "Stop read-back" : "Listen to your record"}
+      <div
+        className="inline-flex items-center gap-1 rounded-full bg-powder/50 p-1 text-charcoal"
+        role="group"
+        aria-label="Read-back playback controls"
       >
-        {loadingAudio ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Preparing…
-          </>
-        ) : speaking ? (
-          <>
-            <Pause className="h-3.5 w-3.5" />
-            Stop read-back
-          </>
-        ) : (
-          <>
-            <Volume2 className="h-3.5 w-3.5" />
-            Listen to your record
-          </>
+        <button
+          type="button"
+          onClick={playOrPause}
+          disabled={busy || loadingAudio}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium hover:bg-powder/60 disabled:opacity-60"
+          aria-label={
+            playing
+              ? "Pause read-back"
+              : paused
+                ? "Resume read-back"
+                : "Listen to your record"
+          }
+          aria-pressed={playing}
+        >
+          {loadingAudio ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Preparing…
+            </>
+          ) : playing ? (
+            <>
+              <Pause className="h-3.5 w-3.5" />
+              Pause
+            </>
+          ) : paused ? (
+            <>
+              <Play className="h-3.5 w-3.5" />
+              Resume
+            </>
+          ) : (
+            <>
+              <Volume2 className="h-3.5 w-3.5" />
+              Listen to your record
+            </>
+          )}
+        </button>
+        {hasAudio && (
+          <button
+            type="button"
+            onClick={() => {
+              stopPlayback();
+              setStatus("Read-back stopped.");
+            }}
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium hover:bg-powder/60"
+            aria-label="Stop read-back"
+          >
+            <Square className="h-3 w-3" />
+            Stop
+          </button>
         )}
-      </button>
+      </div>
+
+      <div className="inline-flex items-center gap-1.5">
+        <Gauge className="h-3.5 w-3.5 text-warm-grey" aria-hidden />
+        <label htmlFor="tts-rate" className="sr-only">
+          Playback speed
+        </label>
+        <select
+          id="tts-rate"
+          value={rate}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            setRate(next);
+            setStatus(`Playback speed set to ${next.toFixed(2)} times normal.`);
+          }}
+          className="rounded-full border border-border/60 bg-background px-2 py-1 text-xs font-medium text-charcoal focus:outline-none focus:ring-2 focus:ring-primary/50"
+        >
+          <option value={0.75}>0.75×</option>
+          <option value={1}>1× (normal)</option>
+          <option value={1.25}>1.25×</option>
+          <option value={1.5}>1.5×</option>
+        </select>
+      </div>
 
       <span className="text-[11px] text-muted-foreground">
         Read-back is optional — a confirmation step before you hand it over.
       </span>
+
+      {/* Polite live region for screen readers. Visually hidden but announced. */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {status}
+      </div>
 
       {error && (
         <div className="basis-full text-[11px] text-destructive" role="alert">
