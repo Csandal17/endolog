@@ -80,6 +80,27 @@ type LogEntry = {
 
 const ENTRIES_KEY = "maai:entries:v1";
 
+function nowLocalDatetime(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatPainWhen(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function painColor(score: number): string {
+  // 0 → green (140°), 10 → red (5°)
+  const hue = Math.round(140 - (score / 10) * 135);
+  return `hsl(${hue} 65% 45%)`;
+}
+
 function readEntries(): LogEntry[] {
   if (typeof window === "undefined") return [];
   try {
