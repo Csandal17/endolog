@@ -212,6 +212,9 @@ function Dashboard() {
   const update = (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const setSocrates = (patch: Partial<SocratesAnswers>) =>
+    setForm((f) => ({ ...f, socrates: { ...f.socrates, ...patch } }));
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.patient_name.trim() || !form.notes.trim()) {
@@ -230,12 +233,13 @@ function Dashboard() {
       const painLine = `Pain (NRS 0–10): ${form.pain_score}/10${
         form.pain_recorded_at ? ` — recorded ${formatPainWhen(form.pain_recorded_at)}` : ""
       }`;
+      const socratesText = formatSocrates(form.socrates);
       const res = await api.processPatientIntake({
         patient_name: form.patient_name.trim(),
         dob: form.dob || undefined,
         sex: form.sex || undefined,
         clinician: form.clinician || undefined,
-        input_text: `${painLine}\n\n${form.notes.trim()}`,
+        input_text: `${painLine}${socratesText ? `\n\n${socratesText}` : ""}\n\n${form.notes.trim()}`,
       });
       if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
       // Fetch the persisted report so the preview renders the exact bytes
