@@ -1231,9 +1231,28 @@ function VoiceControls({
       audio.onended = () => {
         setPlayback("idle");
         setStatus("Read-back finished.");
+        setCurrent(audio.duration || 0);
+      };
+      audio.onloadedmetadata = () => {
+        setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      };
+      audio.ontimeupdate = () => {
+        setCurrent(audio.currentTime);
+        // Announce progress once per ~25% for screen readers, without spam.
+        const dur = audio.duration || 0;
+        if (dur > 0) {
+          const pct = Math.floor((audio.currentTime / dur) * 4);
+          if (pct !== lastAnnouncedRef.current && pct > 0 && pct < 4) {
+            lastAnnouncedRef.current = pct;
+            setStatus(`Read-back ${pct * 25} percent complete.`);
+          }
+        }
       };
       audioRef.current = audio;
       cachedForRef.current = trimmed;
+      lastAnnouncedRef.current = 0;
+      setCurrent(0);
+      setDuration(0);
       await audio.play();
       setStatus("Playing read-back.");
     } catch (err) {
