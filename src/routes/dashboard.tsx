@@ -477,6 +477,128 @@ function Field({
   );
 }
 
+function PainNrsField({
+  score,
+  recordedAt,
+  onScore,
+  onDateTime,
+  onNow,
+}: {
+  score: number;
+  recordedAt: string;
+  onScore: (n: number) => void;
+  onDateTime: (v: string) => void;
+  onNow: () => void;
+}) {
+  const swatch = painColor(score);
+  const pct = (score / 10) * 100;
+  const label =
+    score === 0
+      ? "No pain"
+      : score <= 3
+        ? "Mild"
+        : score <= 6
+          ? "Moderate"
+          : score <= 9
+            ? "Severe"
+            : "Worst ever";
+  return (
+    <div className="rounded-2xl border border-border/60 bg-muted/30 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Label className="text-xs font-medium uppercase tracking-wide text-warm-grey">
+            How is your pain right now?
+          </Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Numerical Rating Scale (NRS) · 0 = no pain, 10 = worst imaginable pain
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="sr-only" htmlFor="pain-when">
+            When was this pain level?
+          </label>
+          <div className="relative">
+            <Clock className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="pain-when"
+              type="datetime-local"
+              value={recordedAt}
+              onChange={(e) => onDateTime(e.target.value)}
+              className="h-9 w-[13.5rem] pl-8 text-xs"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onNow}
+            className="h-9 rounded-full text-xs"
+          >
+            Now
+          </Button>
+        </div>
+      </div>
+
+      <div
+        className="mt-6"
+        role="group"
+        aria-labelledby="pain-scale-label"
+      >
+        <div id="pain-scale-label" className="sr-only">
+          Pain intensity from 0 to 10
+        </div>
+        <div className="relative h-8">
+          <div
+            className="absolute -top-1 flex -translate-x-1/2 flex-col items-center"
+            style={{ left: `${pct}%` }}
+          >
+            <div
+              className="grid h-9 w-11 place-items-center rounded-lg text-sm font-semibold text-white shadow-sm"
+              style={{ backgroundColor: swatch }}
+              aria-live="polite"
+            >
+              {score}
+            </div>
+            <div
+              className="h-2 w-2 rotate-45"
+              style={{ backgroundColor: swatch, marginTop: -4 }}
+            />
+          </div>
+        </div>
+
+        <div className="relative">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
+            style={{
+              background:
+                "linear-gradient(to right, hsl(140 65% 45%), hsl(75 70% 45%), hsl(45 90% 50%), hsl(20 85% 50%), hsl(5 75% 45%))",
+            }}
+            aria-hidden="true"
+          />
+          <Slider
+            value={[score]}
+            min={0}
+            max={10}
+            step={1}
+            onValueChange={(v) => onScore(v[0] ?? 0)}
+            aria-label="Pain score from 0 to 10"
+            aria-valuetext={`${score} out of 10, ${label}`}
+            className="relative [&>[data-orientation=horizontal]]:bg-transparent [&_[role=slider]]:h-6 [&_[role=slider]]:w-6 [&_[role=slider]]:border-2 [&_[role=slider]]:border-foreground/70 [&_[role=slider]]:bg-background [&_[role=slider]]:shadow"
+          />
+        </div>
+
+        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>0 · No pain</span>
+          <span aria-hidden="true" className="font-medium" style={{ color: swatch }}>
+            {label}
+          </span>
+          <span>10 · Worst ever</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const STAGES: { id: Stage; title: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "intake", title: "Intake", desc: "Reading patient information", icon: UserRound },
   { id: "normalising", title: "Normalisation", desc: "Structuring with clinical schemas", icon: Sparkles },
