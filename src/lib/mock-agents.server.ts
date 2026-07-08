@@ -14,7 +14,6 @@ export type IntakeInput = {
   sex?: string;
   clinician?: string;
   input_text: string;
-  include_audio_readback?: boolean;
 };
 
 const TERM_MATCHERS: { pattern: RegExp; term: string }[] = [
@@ -155,7 +154,6 @@ async function runNormalisationAgent(input: IntakeInput, normalized_text: string
       ],
       clinical_terms: terms,
       socrates,
-      audio_readback_enabled: Boolean(input.include_audio_readback),
     },
   };
 }

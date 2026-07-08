@@ -28,11 +28,6 @@ export type IntakePayload = {
   sex?: string;
   clinician?: string;
   input_text: string;
-  /**
-   * When true, the generated PDF includes an accessibility "audio read-back"
-   * section with a link to a TTS version of the report.
-   */
-  include_audio_readback?: boolean;
 };
 
 export type AgentStage = {
@@ -63,7 +58,6 @@ export type StructuredReport = {
     exacerbating_relieving: string | null;
     severity: string | null;
   };
-  audio_readback_enabled: boolean;
   generated_at: string;
   patient: {
     name: string;
