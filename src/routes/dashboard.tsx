@@ -297,6 +297,7 @@ function Dashboard() {
                   <IntakeCard
                     form={form}
                     update={update}
+                    setSocrates={setSocrates}
                     onPainScore={(n) => setForm((f) => ({ ...f, pain_score: n }))}
                     onPainDateTime={(v) => setForm((f) => ({ ...f, pain_recorded_at: v }))}
                     onPainDateTimeNow={() =>
@@ -306,7 +307,11 @@ function Dashboard() {
                     submitting={submitting}
                     error={error ?? job?.error ?? null}
                     onReset={() =>
-                      setForm({ ...emptyForm, pain_recorded_at: nowLocalDatetime() })
+                      setForm({
+                        ...emptyForm,
+                        pain_recorded_at: nowLocalDatetime(),
+                        socrates: { ...emptySocrates },
+                      })
                     }
                   />
                 </motion.div>
