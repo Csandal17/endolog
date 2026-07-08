@@ -393,6 +393,23 @@ function IntakeCard({
           </div>
         )}
 
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border/60 bg-parchment/60 p-3">
+          <input
+            type="checkbox"
+            checked={form.include_audio_readback}
+            onChange={(e) => onToggleAudio(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border/70 accent-primary"
+            aria-describedby="audio-readback-hint"
+          />
+          <span className="text-sm">
+            <span className="font-medium text-charcoal">Include accessibility audio read-back</span>
+            <span id="audio-readback-hint" className="mt-0.5 block text-xs text-muted-foreground">
+              Adds a link to a spoken version of the PDF report — helpful for
+              vision-impaired patients or when reviewing on the go.
+            </span>
+          </span>
+        </label>
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
