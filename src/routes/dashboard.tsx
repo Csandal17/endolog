@@ -324,6 +324,7 @@ function IntakeCard({
   submitting,
   error,
   onReset,
+  onToggleAudio,
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -331,6 +332,7 @@ function IntakeCard({
   submitting: boolean;
   error: string | null;
   onReset: () => void;
+  onToggleAudio: (value: boolean) => void;
 }) {
   return (
     <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
