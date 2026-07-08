@@ -981,6 +981,11 @@ function VoiceControls({
   const [error, setError] = useState<string | null>(null);
   const [rate, setRate] = useState(1);
   const [status, setStatus] = useState("");
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+  const [micPermission, setMicPermission] = useState<
+    "unknown" | "prompt" | "granted" | "denied" | "unsupported"
+  >("unknown");
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -988,12 +993,43 @@ function VoiceControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const cachedForRef = useRef<string | null>(null);
+  const lastAnnouncedRef = useRef(0);
 
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
       audioRef.current?.pause();
+    };
+  }, []);
+
+  // Query mic permission state on mount so we can show the right prompt.
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicPermission("unsupported");
+      return;
+    }
+    const perms = (navigator as Navigator & {
+      permissions?: {
+        query: (d: { name: PermissionName }) => Promise<PermissionStatus>;
+      };
+    }).permissions;
+    if (!perms?.query) {
+      setMicPermission("prompt");
+      return;
+    }
+    let status: PermissionStatus | null = null;
+    perms
+      .query({ name: "microphone" as PermissionName })
+      .then((s) => {
+        status = s;
+        setMicPermission(s.state as "granted" | "denied" | "prompt");
+        s.onchange = () => setMicPermission(s.state as "granted" | "denied" | "prompt");
+      })
+      .catch(() => setMicPermission("prompt"));
+    return () => {
+      if (status) status.onchange = null;
     };
   }, []);
 
@@ -1022,6 +1058,7 @@ function VoiceControls({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      setMicPermission("granted");
       const mime = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4")
@@ -1050,8 +1087,39 @@ function VoiceControls({
       setStatus("Recording. Speak in your own language.");
     } catch (err) {
       console.error(err);
-      setError("Microphone access is needed to dictate.");
-      setStatus("Microphone access denied.");
+      const denied =
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "SecurityError");
+      if (denied) setMicPermission("denied");
+      setError(
+        denied
+          ? "Microphone access is blocked. Enable it in your browser's site settings for this page, then try again."
+          : "Microphone unavailable. Check that a mic is connected.",
+      );
+      setStatus(denied ? "Microphone access denied." : "Microphone unavailable.");
+    }
+  }
+
+  async function requestMicAccess() {
+    setError(null);
+    setStatus("Requesting microphone access…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately stop — this call is only to trigger the permission prompt.
+      stream.getTracks().forEach((t) => t.stop());
+      setMicPermission("granted");
+      setStatus("Microphone access granted. You can now dictate.");
+    } catch (err) {
+      const denied =
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "SecurityError");
+      if (denied) setMicPermission("denied");
+      setError(
+        denied
+          ? "Microphone access is blocked. Enable it in your browser's site settings for this page, then try again."
+          : "Microphone unavailable. Check that a mic is connected.",
+      );
+      setStatus(denied ? "Microphone access denied." : "Microphone unavailable.");
     }
   }
 
@@ -1163,9 +1231,28 @@ function VoiceControls({
       audio.onended = () => {
         setPlayback("idle");
         setStatus("Read-back finished.");
+        setCurrent(audio.duration || 0);
+      };
+      audio.onloadedmetadata = () => {
+        setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      };
+      audio.ontimeupdate = () => {
+        setCurrent(audio.currentTime);
+        // Announce progress once per ~25% for screen readers, without spam.
+        const dur = audio.duration || 0;
+        if (dur > 0) {
+          const pct = Math.floor((audio.currentTime / dur) * 4);
+          if (pct !== lastAnnouncedRef.current && pct > 0 && pct < 4) {
+            lastAnnouncedRef.current = pct;
+            setStatus(`Read-back ${pct * 25} percent complete.`);
+          }
+        }
       };
       audioRef.current = audio;
       cachedForRef.current = trimmed;
+      lastAnnouncedRef.current = 0;
+      setCurrent(0);
+      setDuration(0);
       await audio.play();
       setStatus("Playing read-back.");
     } catch (err) {
@@ -1301,6 +1388,96 @@ function VoiceControls({
         Read-back is optional — a confirmation step before you hand it over.
       </span>
 
+      {/* Microphone permission banner */}
+      {(micPermission === "denied" ||
+        micPermission === "prompt" ||
+        micPermission === "unsupported") && (
+        <div
+          className="basis-full rounded-2xl border border-border/60 bg-parchment/70 px-3 py-2 text-[11px] text-warm-grey"
+          role="note"
+        >
+          {micPermission === "denied" ? (
+            <span>
+              Microphone access is blocked. Open your browser's site settings for this page,
+              set microphone to <strong>Allow</strong>, then reload.
+            </span>
+          ) : micPermission === "unsupported" ? (
+            <span>
+              Your browser doesn't support microphone input. You can still type your notes and
+              use read-back.
+            </span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Maai needs microphone access to dictate.</span>
+              <button
+                type="button"
+                onClick={requestMicAccess}
+                className="inline-flex items-center gap-1 rounded-full bg-pink/40 px-2.5 py-1 text-[11px] font-medium text-charcoal hover:bg-pink/60"
+              >
+                <Mic className="h-3 w-3" />
+                Allow microphone
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Playback progress + times */}
+      {hasAudio && duration > 0 && (
+        <div className="basis-full">
+          <div
+            role="slider"
+            tabIndex={0}
+            aria-label="Read-back progress"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(current)}
+            aria-valuetext={`${formatDuration(current)} of ${formatDuration(duration)}, ${
+              Math.round((current / duration) * 100)
+            } percent`}
+            onKeyDown={(e) => {
+              const audio = audioRef.current;
+              if (!audio) return;
+              if (e.key === "ArrowRight") {
+                audio.currentTime = Math.min(duration, audio.currentTime + 5);
+                e.preventDefault();
+              } else if (e.key === "ArrowLeft") {
+                audio.currentTime = Math.max(0, audio.currentTime - 5);
+                e.preventDefault();
+              } else if (e.key === "Home") {
+                audio.currentTime = 0;
+                e.preventDefault();
+              } else if (e.key === "End") {
+                audio.currentTime = duration;
+                e.preventDefault();
+              } else if (e.key === " " || e.key === "Enter") {
+                playOrPause();
+                e.preventDefault();
+              }
+            }}
+            onClick={(e) => {
+              const audio = audioRef.current;
+              if (!audio || !duration) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+              audio.currentTime = pct * duration;
+              setCurrent(audio.currentTime);
+              setStatus(`Seeked to ${formatDuration(audio.currentTime)}.`);
+            }}
+            className="group relative h-2 w-full cursor-pointer overflow-hidden rounded-full bg-stone/50 focus:outline-none focus:ring-2 focus:ring-primary/60"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-150"
+              style={{ width: `${Math.min(100, (current / duration) * 100)}%` }}
+            />
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[11px] tabular-nums text-warm-grey">
+            <span aria-hidden>{formatDuration(current)}</span>
+            <span aria-hidden>−{formatDuration(Math.max(0, duration - current))}</span>
+          </div>
+        </div>
+      )}
+
       {/* Polite live region for screen readers. Visually hidden but announced. */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {status}
@@ -1313,4 +1490,11 @@ function VoiceControls({
       )}
     </div>
   );
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
