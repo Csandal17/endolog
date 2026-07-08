@@ -16,6 +16,7 @@ import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiProcessRouteImport } from './routes/api/process'
 import { Route as ApiReportsIndexRouteImport } from './routes/api/reports/index'
 import { Route as ApiReportsIdRouteImport } from './routes/api/reports/$id'
+import { Route as ApiReportsIdPdfRouteImport } from './routes/api/reports/$id/pdf'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -52,6 +53,11 @@ const ApiReportsIdRoute = ApiReportsIdRouteImport.update({
   path: '/api/reports/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReportsIdPdfRoute = ApiReportsIdPdfRouteImport.update({
+  id: '/pdf',
+  path: '/pdf',
+  getParentRoute: () => ApiReportsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,8 +65,9 @@ export interface FileRoutesByFullPath {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
-  '/api/reports/$id': typeof ApiReportsIdRoute
+  '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports/': typeof ApiReportsIndexRoute
+  '/api/reports/$id/pdf': typeof ApiReportsIdPdfRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,8 +75,9 @@ export interface FileRoutesByTo {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
-  '/api/reports/$id': typeof ApiReportsIdRoute
+  '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports': typeof ApiReportsIndexRoute
+  '/api/reports/$id/pdf': typeof ApiReportsIdPdfRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,8 +86,9 @@ export interface FileRoutesById {
   '/api/process': typeof ApiProcessRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
-  '/api/reports/$id': typeof ApiReportsIdRoute
+  '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports/': typeof ApiReportsIndexRoute
+  '/api/reports/$id/pdf': typeof ApiReportsIdPdfRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/reports/$id'
     | '/api/reports/'
+    | '/api/reports/$id/pdf'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/reports/$id'
     | '/api/reports'
+    | '/api/reports/$id/pdf'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/reports/$id'
     | '/api/reports/'
+    | '/api/reports/$id/pdf'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,7 +129,7 @@ export interface RootRouteChildren {
   ApiProcessRoute: typeof ApiProcessRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
-  ApiReportsIdRoute: typeof ApiReportsIdRoute
+  ApiReportsIdRoute: typeof ApiReportsIdRouteWithChildren
   ApiReportsIndexRoute: typeof ApiReportsIndexRoute
 }
 
@@ -172,8 +184,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReportsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reports/$id/pdf': {
+      id: '/api/reports/$id/pdf'
+      path: '/pdf'
+      fullPath: '/api/reports/$id/pdf'
+      preLoaderRoute: typeof ApiReportsIdPdfRouteImport
+      parentRoute: typeof ApiReportsIdRoute
+    }
   }
 }
+
+interface ApiReportsIdRouteChildren {
+  ApiReportsIdPdfRoute: typeof ApiReportsIdPdfRoute
+}
+
+const ApiReportsIdRouteChildren: ApiReportsIdRouteChildren = {
+  ApiReportsIdPdfRoute: ApiReportsIdPdfRoute,
+}
+
+const ApiReportsIdRouteWithChildren = ApiReportsIdRoute._addFileChildren(
+  ApiReportsIdRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -181,7 +212,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProcessRoute: ApiProcessRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
-  ApiReportsIdRoute: ApiReportsIdRoute,
+  ApiReportsIdRoute: ApiReportsIdRouteWithChildren,
   ApiReportsIndexRoute: ApiReportsIndexRoute,
 }
 export const routeTree = rootRouteImport
