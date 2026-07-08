@@ -28,6 +28,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { jsPDF } from "jspdf";
+import * as api from "@/services/api";
+import type { Report as ApiReport, StructuredReport } from "@/services/api";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -40,8 +42,6 @@ export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
 });
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-
 type Stage = "intake" | "normalising" | "generating" | "complete" | "error";
 
 type ReportSection = { title: string; content: string };
@@ -52,6 +52,7 @@ type JobStatus = {
   pdf_url?: string;
   error?: string;
   terms?: string[];
+  report_id?: string;
 };
 
 type IntakeForm = {
@@ -102,13 +103,14 @@ function writeEntries(next: LogEntry[]) {
 
 function Dashboard() {
   const [form, setForm] = useState<IntakeForm>(emptyForm);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockTimerRef = useRef<number | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const savedForJobRef = useRef<string | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   // Load persisted entries after mount (avoid SSR/hydration mismatch)
   useEffect(() => {
@@ -118,7 +120,7 @@ function Dashboard() {
   // When a job completes, persist an entry once.
   useEffect(() => {
     if (!job || job.status !== "complete") return;
-    const key = jobId ?? "job";
+    const key = reportId ?? "job";
     if (savedForJobRef.current === key) return;
     savedForJobRef.current = key;
     const terms = deriveTerms(job, form);
@@ -134,7 +136,7 @@ function Dashboard() {
       writeEntries(next);
       return next;
     });
-  }, [job, jobId, form]);
+  }, [job, reportId, form]);
 
   function deleteEntry(id: string) {
     setEntries((prev) => {
@@ -164,64 +166,51 @@ function Dashboard() {
     }
     setError(null);
     setSubmitting(true);
-    setJob({ status: "intake", stage_label: "Receiving intake" });
+    setReportId(null);
+    // Kick off a client-side visual walk through the three agents while the
+    // API request is in flight — the mock backend replies in < 2s but we
+    // want the user to see each stage light up.
+    animateStages(setJob, mockTimerRef);
 
     try {
-      if (!API_BASE) {
-        // Demo fallback — simulate the three-agent pipeline
-        runMockPipeline(form, setJob);
-        setJobId("demo-job");
-        setSubmitting(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+      const res = await api.processPatientIntake({
+        patient_name: form.patient_name.trim(),
+        dob: form.dob || undefined,
+        sex: form.sex || undefined,
+        clinician: form.clinician || undefined,
+        input_text: form.notes.trim(),
       });
-      if (!res.ok) throw new Error(`Intake failed (${res.status})`);
-      const data = (await res.json()) as { job_id: string };
-      setJobId(data.job_id);
+      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
+      // Fetch the persisted report so the preview renders the exact bytes
+      // that the backend stored (parity with the future FastAPI response).
+      const stored = await api.getReport(res.report_id);
+      const structured = stored.structured_data;
+      if (!structured) throw new Error("Backend did not return structured data");
+      setReportId(res.report_id);
+      setJob({
+        status: "complete",
+        stage_label: "Pipeline complete",
+        report: toLegacyReport(structured),
+        pdf_url: stored.pdf_url ?? `/api/reports/${res.report_id}/pdf`,
+        terms: structured.clinical_terms,
+        report_id: res.report_id,
+      });
+      setHistoryRefreshKey((k) => k + 1);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setJob({ status: "error", error: "Could not reach the intake service." });
+      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
+      const message = err instanceof Error ? err.message : "Could not reach the intake service.";
+      setError(message);
+      setJob({ status: "error", error: message });
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Poll status when a real jobId is set
-  useEffect(() => {
-    if (!jobId || jobId === "demo-job" || !API_BASE) return;
-    let cancelled = false;
-    let timeout: number;
-    const tick = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/jobs/${jobId}`);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = (await res.json()) as JobStatus;
-        if (cancelled) return;
-        setJob(data);
-        if (data.status !== "complete" && data.status !== "error") {
-          timeout = window.setTimeout(tick, 1500);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setJob({ status: "error", error: err instanceof Error ? err.message : "Polling failed" });
-      }
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timeout) window.clearTimeout(timeout);
-    };
-  }, [jobId]);
-
   function reset() {
     if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
     setJob(null);
-    setJobId(null);
+    setReportId(null);
     setError(null);
   }
 
@@ -266,12 +255,16 @@ function Dashboard() {
           </section>
 
           <section>
-            <ReportPreview job={job} form={form} />
+            <ReportPreview job={job} form={form} reportId={reportId} />
           </section>
         </div>
 
         <section className="mt-10">
           <TimelineCard entries={entries} onDelete={deleteEntry} onClear={clearEntries} />
+        </section>
+
+        <section className="mt-10">
+          <ReportHistoryCard refreshKey={historyRefreshKey} />
         </section>
       </main>
     </div>
@@ -548,7 +541,15 @@ function ProgressCard({
   );
 }
 
-function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm }) {
+function ReportPreview({
+  job,
+  form,
+  reportId,
+}: {
+  job: JobStatus | null;
+  form: IntakeForm;
+  reportId: string | null;
+}) {
   const empty = !job;
   const done = job?.status === "complete";
   const report = job?.report;
@@ -567,7 +568,7 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
             </p>
           </div>
         </div>
-        {done && <DownloadButton job={job} report={report} form={form} />}
+        {done && <DownloadButton job={job} reportId={reportId} />}
       </div>
 
       <div className="mt-6 rounded-2xl border border-border/60 bg-parchment p-6 shadow-inner">
@@ -589,37 +590,19 @@ function ReportPreview({ job, form }: { job: JobStatus | null; form: IntakeForm 
 
 function DownloadButton({
   job,
-  report,
-  form,
+  reportId,
 }: {
   job: JobStatus;
-  report?: JobStatus["report"];
-  form: IntakeForm;
+  reportId: string | null;
 }) {
-  const href = job.pdf_url
-    ? job.pdf_url.startsWith("http")
-      ? job.pdf_url
-      : `${API_BASE}${job.pdf_url}`
-    : null;
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        <Download className="h-4 w-4" />
-        Download PDF
-      </a>
-    );
-  }
+  const id = reportId ?? job.report_id ?? null;
   return (
     <button
-      onClick={() => generateClientPdf(report, form)}
-      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      title="Generated locally in your browser. Set VITE_API_BASE_URL to use a backend-rendered PDF."
+      type="button"
+      onClick={() => id && api.downloadReport(id)}
+      disabled={!id}
+      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+      title="Fetches the PDF from the backend (mock today, FastAPI later)."
     >
       <Download className="h-4 w-4" />
       Download PDF
@@ -1593,4 +1576,180 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ---------- API adapters ----------
+
+/**
+ * Adapt the structured report shape returned by the API service into the
+ * section-based shape the existing `RenderedReport` component understands.
+ * When the real FastAPI backend returns a schema compatible with
+ * `StructuredReport`, this stays; if it returns something else, edit only
+ * this function.
+ */
+function toLegacyReport(s: StructuredReport): JobStatus["report"] {
+  const patient: Record<string, string> = {
+    Name: s.patient.name,
+    DOB: s.patient.dob || "—",
+    Sex: s.patient.sex || "—",
+    Clinician: s.patient.clinician || "—",
+  };
+  const bullet = (items: string[]) => items.map((i) => `• ${i}`).join("\n");
+  return {
+    patient,
+    sections: [
+      { title: "Patient summary", content: s.patient_summary },
+      { title: "Key findings", content: bullet(s.key_findings) },
+      { title: "Risk indicators", content: bullet(s.risk_indicators) },
+      { title: "Recommendations", content: bullet(s.recommendations) },
+      { title: "Follow-up actions", content: bullet(s.follow_up_actions) },
+    ],
+  };
+}
+
+/**
+ * Client-side visual stagger through the three agents while the real API
+ * request is in flight. Purely cosmetic — the pipeline runs on the server.
+ */
+function animateStages(
+  setJob: (j: JobStatus) => void,
+  timerRef: React.MutableRefObject<number | null>,
+) {
+  const steps: JobStatus[] = [
+    { status: "intake", stage_label: "Agent 1 · Intake" },
+    { status: "normalising", stage_label: "Agent 2 · Normalisation" },
+    { status: "generating", stage_label: "Agent 3 · PDF report" },
+  ];
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length) return;
+    setJob(steps[i]);
+    i++;
+    timerRef.current = window.setTimeout(tick, 650);
+  };
+  tick();
+}
+
+// ---------- Report history (server-backed) ----------
+
+function ReportHistoryCard({ refreshKey }: { refreshKey: number }) {
+  const [reports, setReports] = useState<ApiReport[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    api
+      .getReports(20)
+      .then((data) => {
+        if (!cancelled) setReports(data);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : "Could not load history");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  return (
+    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-powder/50 text-charcoal">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl leading-none tracking-tight">
+              Report history
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every report generated by the pipeline · stored in Lovable Cloud
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        {loadError ? (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {loadError}
+          </div>
+        ) : reports === null ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-2xl bg-stone/40" />
+            ))}
+          </div>
+        ) : reports.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
+            No reports yet. Submit an intake above to generate the first one.
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {reports.map((r) => {
+              const s = r.structured_data;
+              const title = s?.patient?.name ?? "Patient report";
+              const summary = s?.patient_summary ?? "—";
+              return (
+                <li key={r.id} className="flex flex-wrap items-start justify-between gap-4 py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">{title}</span>
+                      <StatusPill status={r.status} />
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {summary}
+                    </p>
+                    {s?.clinical_terms && s.clinical_terms.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {s.clinical_terms.slice(0, 6).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full bg-pink/25 px-2.5 py-0.5 text-[11px] font-medium text-charcoal"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => api.downloadReport(r.id)}
+                    disabled={r.status !== "complete"}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    PDF
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StatusPill({ status }: { status: ApiReport["status"] }) {
+  const config: Record<ApiReport["status"], { label: string; className: string }> = {
+    complete: { label: "Complete", className: "bg-sage/40 text-charcoal" },
+    processing: { label: "Processing", className: "bg-butter/50 text-charcoal" },
+    pending: { label: "Pending", className: "bg-stone/50 text-charcoal" },
+    error: { label: "Error", className: "bg-destructive/15 text-destructive" },
+  };
+  const c = config[status] ?? config.pending;
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${c.className}`}
+    >
+      {c.label}
+    </span>
+  );
 }
