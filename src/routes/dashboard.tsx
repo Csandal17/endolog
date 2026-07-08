@@ -355,23 +355,13 @@ function IntakeCard({
           required
           hint="In your own words, in any language. Speak it or type it — Maai will map it to clinical terms."
         >
-          <div className="space-y-2">
-            <Textarea
-              value={form.notes}
-              onChange={update("notes")}
-              placeholder="e.g. sharp cramping on my left side for the last three days, worse at night, waking me up. Bloated most afternoons…"
-              rows={9}
-              className="resize-none"
-            />
-            <VoiceControls
-              text={form.notes}
-              onTranscript={(t) =>
-                update("notes")({
-                  target: { value: form.notes ? `${form.notes.trim()} ${t}`.trim() : t },
-                } as unknown as React.ChangeEvent<HTMLTextAreaElement>)
-              }
-            />
-          </div>
+          <Textarea
+            value={form.notes}
+            onChange={update("notes")}
+            placeholder="e.g. sharp cramping on my left side for the last three days, worse at night, waking me up. Bloated most afternoons…"
+            rows={9}
+            className="resize-none"
+          />
         </Field>
 
         {error && (
@@ -380,23 +370,6 @@ function IntakeCard({
             <span>{error}</span>
           </div>
         )}
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border/60 bg-parchment/60 p-3">
-          <input
-            type="checkbox"
-            checked={form.include_audio_readback}
-            onChange={(e) => onToggleAudio(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border/70 accent-primary"
-            aria-describedby="audio-readback-hint"
-          />
-          <span className="text-sm">
-            <span className="font-medium text-charcoal">Include accessibility audio read-back</span>
-            <span id="audio-readback-hint" className="mt-0.5 block text-xs text-muted-foreground">
-              Adds a link to a spoken version of the PDF report — helpful for
-              vision-impaired patients or when reviewing on the go.
-            </span>
-          </span>
-        </label>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
