@@ -1629,61 +1629,63 @@ export function ReportHistoryCard({ refreshKey }: { refreshKey: number }) {
         ) : (
           <ul className="divide-y" style={{ borderColor: C.border }}>
             {reports.map((r) => {
-              const s = r.structured_data;
-              const title = s?.patient?.name ?? "Patient report";
-              const summary = s?.patient_summary ?? "—";
+              const dt = new Date(r.created_at);
+              const canOpen = r.status === "complete";
               return (
-                <li key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-4 sm:flex sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate font-semibold" style={{ color: C.text }}>{title}</span>
+                <li
+                  key={r.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-4"
+                >
+                  <button
+                    onClick={() => canOpen && api.downloadReport(r.id)}
+                    disabled={!canOpen}
+                    className="min-w-0 text-left disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                       <span
-                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{
-                          background: r.status === "complete" ? C.green : C.light,
-                          color: C.text,
-                        }}
+                        className="font-semibold"
+                        style={{ color: C.text, fontFamily: "Fraunces, serif" }}
                       >
-                        {r.status}
+                        {dt.toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </span>
-                      <span className="text-xs" style={{ color: C.muted }}>
-                        {new Date(r.created_at).toLocaleString()}
+                      <span className="text-sm" style={{ color: C.muted }}>
+                        {dt.toLocaleTimeString(undefined, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
+                      {!canOpen && (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ background: C.light, color: C.text }}
+                        >
+                          {r.status}
+                        </span>
+                      )}
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm" style={{ color: C.muted }}>{summary}</p>
-                    {s?.clinical_terms && s.clinical_terms.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {s.clinical_terms.slice(0, 6).map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-full px-2 py-0.5 text-[11px]"
-                            style={{ background: C.pink, color: C.text }}
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
+                    {canOpen && (
+                      <p
+                        className="mt-1 inline-flex items-center gap-1 text-xs underline"
+                        style={{ color: C.muted }}
+                      >
+                        <Download className="h-3 w-3" />
+                        Open review (PDF)
+                      </p>
                     )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      onClick={() => del(r.id)}
-                      className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs"
-                      style={{ borderColor: C.border, color: C.muted, background: "#fff" }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                    <button
-                      onClick={() => api.downloadReport(r.id)}
-                      disabled={r.status !== "complete"}
-                      className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs disabled:opacity-50"
-                      style={{ borderColor: C.border, color: C.text, background: "#fff" }}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      PDF
-                    </button>
-                  </div>
+                  </button>
+                  <button
+                    onClick={() => del(r.id)}
+                    aria-label="Delete report"
+                    className="shrink-0 rounded-full p-2"
+                    style={{ color: C.muted, background: "transparent" }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </li>
               );
             })}
