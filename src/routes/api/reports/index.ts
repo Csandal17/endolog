@@ -6,14 +6,8 @@ export const Route = createFileRoute("/api/reports/")({
       GET: async ({ request }) => {
         const url = new URL(request.url);
         const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") ?? 50)));
-        const { requireUserSupabase } = await import("@/lib/supabase-server");
-        let supabase;
-        try {
-          ({ supabase } = await requireUserSupabase(request));
-        } catch (e) {
-          if (e instanceof Response) return e;
-          throw e;
-        }
+        const { getServerSupabase } = await import("@/lib/supabase-server");
+        const supabase = getServerSupabase();
         const { data, error } = await supabase
           .from("reports")
           .select("id, patient_id, status, structured_data, pdf_url, created_at")

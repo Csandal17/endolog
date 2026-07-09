@@ -14,8 +14,6 @@
 //   GET    /api/reports/:id/pdf      -> application/pdf (or JSON fallback)
 // ============================================================================
 
-import { supabase } from "@/integrations/supabase/client";
-
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 function url(path: string) {
@@ -90,11 +88,11 @@ export type ProcessResponse = {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url(path), {
     ...init,
-    headers: await withAuthHeaders({
+    headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
       ...(init?.headers ?? {}),
-    }),
+    },
   });
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
@@ -107,14 +105,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(message, res.status);
   }
   return (await res.json()) as T;
-}
-
-async function withAuthHeaders(base: HeadersInit): Promise<HeadersInit> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const headers = new Headers(base);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return headers;
 }
 
 export class ApiError extends Error {
@@ -154,23 +144,16 @@ export function getReports(limit = 50): Promise<Report[]> {
  * PDF rendered from the structured report; when the real FastAPI backend is
  * connected the same URL streams the fpdf2 output — no UI change required.
  */
-export async function downloadReport(reportId: string): Promise<void> {
-  const res = await fetch(url(`/api/reports/${encodeURIComponent(reportId)}/pdf`), {
-    headers: await withAuthHeaders({ Accept: "application/pdf" }),
-  });
-  if (!res.ok) {
-    throw new ApiError(`Failed to download report (${res.status})`, res.status);
-  }
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
+export function downloadReport(reportId: string): void {
+  const href = url(`/api/reports/${encodeURIComponent(reportId)}/pdf`);
+  // Use a hidden anchor so the browser respects the Content-Disposition header.
   const a = document.createElement("a");
-  a.href = objectUrl;
-  a.download = `maai-report-${reportId}.pdf`;
+  a.href = href;
   a.rel = "noopener";
+  a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 export function deleteReport(reportId: string): Promise<void> {

@@ -3,15 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/reports/$id")({
   server: {
     handlers: {
-      GET: async ({ params, request }) => {
-        const { requireUserSupabase } = await import("@/lib/supabase-server");
-        let supabase;
-        try {
-          ({ supabase } = await requireUserSupabase(request));
-        } catch (e) {
-          if (e instanceof Response) return e;
-          throw e;
-        }
+      GET: async ({ params }) => {
+        const { getServerSupabase } = await import("@/lib/supabase-server");
+        const supabase = getServerSupabase();
         const { data, error } = await supabase
           .from("reports")
           .select("id, patient_id, status, structured_data, pdf_url, created_at")
@@ -21,15 +15,9 @@ export const Route = createFileRoute("/api/reports/$id")({
         if (!data) return json({ error: "Report not found" }, 404);
         return json(data);
       },
-      DELETE: async ({ params, request }) => {
-        const { requireUserSupabase } = await import("@/lib/supabase-server");
-        let supabase;
-        try {
-          ({ supabase } = await requireUserSupabase(request));
-        } catch (e) {
-          if (e instanceof Response) return e;
-          throw e;
-        }
+      DELETE: async ({ params }) => {
+        const { getServerSupabase } = await import("@/lib/supabase-server");
+        const supabase = getServerSupabase();
         const { error } = await supabase.from("reports").delete().eq("id", params.id);
         if (error) return json({ error: error.message }, 500);
         return json({ success: true });

@@ -24,21 +24,15 @@ export const Route = createFileRoute("/api/process")({
         if (!input_text) return json({ error: "input_text is required" }, 400);
         if (!patient_name) return json({ error: "patient_name is required" }, 400);
 
-        const [{ runPipeline }, { requireUserSupabase }] = await Promise.all([
+        const [{ runPipeline }, { getServerSupabase }] = await Promise.all([
           import("@/lib/mock-agents.server"),
           import("@/lib/supabase-server"),
         ]);
-        let supabase, userId;
-        try {
-          ({ supabase, userId } = await requireUserSupabase(request));
-        } catch (e) {
-          if (e instanceof Response) return e;
-          throw e;
-        }
+        const supabase = getServerSupabase();
 
         const { data: patient, error: patientError } = await supabase
           .from("patients")
-          .insert({ input_text, user_id: userId })
+          .insert({ input_text })
           .select("id")
           .single();
         if (patientError || !patient) {
@@ -58,7 +52,6 @@ export const Route = createFileRoute("/api/process")({
             .from("reports")
             .insert({
               patient_id: patient.id,
-              user_id: userId,
               status: "complete",
               structured_data: report,
               pdf_url: null,
@@ -81,7 +74,6 @@ export const Route = createFileRoute("/api/process")({
         } catch (err) {
           await supabase.from("reports").insert({
             patient_id: patient.id,
-            user_id: userId,
             status: "error",
             structured_data: null,
           });
