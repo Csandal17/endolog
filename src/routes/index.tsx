@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import endoherLogo from "@/assets/endoher-logo.png";
+import niceLogo from "@/assets/nice-guidelines.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: Index,
