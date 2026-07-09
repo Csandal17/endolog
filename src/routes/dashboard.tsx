@@ -719,13 +719,14 @@ function PainTooltip({ value, pct, visible }: { value: number; pct: number; visi
     <div
       aria-hidden={!visible}
       className="pointer-events-none absolute left-0 right-0 z-20"
-      style={{ top: -12, transform: "translateY(-100%)" }}
+      style={{ top: 0 }}
     >
       <div className="relative h-0">
         <div
           className="absolute"
           style={{
             left: `${pct}%`,
+            bottom: 12,
             transform: `translateX(${-pct}%)`,
             maxWidth: 240,
             width: "max-content",
