@@ -38,7 +38,7 @@ function Wordmark({ className = "" }: { className?: string }) {
       <div className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
         <span className="font-serif text-base leading-none">M</span>
       </div>
-      <span className="font-serif text-2xl tracking-tight text-charcoal">Maai</span>
+      <span className="font-serif text-2xl tracking-tight text-charcoal">EndoHer</span>
     </Link>
   );
 }
@@ -50,7 +50,7 @@ function Nav() {
         <Wordmark />
         <nav className="hidden items-center gap-8 text-sm text-warm-grey md:flex">
           <a href="#how" className="hover:text-foreground">How it works</a>
-          <a href="#why" className="hover:text-foreground">Why Maai</a>
+          <a href="#why" className="hover:text-foreground">Why EndoHer</a>
           <a href="#story" className="hover:text-foreground">Story</a>
         </nav>
         <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ function Hero() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" className="rounded-full border-border bg-background px-6" asChild>
-              <a href="#how">How Maai listens</a>
+              <a href="#how">How EndoHer listens</a>
             </Button>
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-warm-grey">
@@ -239,7 +239,7 @@ function Statistics() {
     <section id="why" className="border-y border-border/40 bg-secondary/40">
       <div className="mx-auto max-w-6xl px-6 py-16">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">Why Maai exists</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">Why EndoHer exists</p>
           <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-charcoal sm:text-4xl">
             Endometriosis is hard to name — and easy to dismiss.
           </h2>
@@ -265,7 +265,7 @@ function Statistics() {
 
         <p className="mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-warm-grey">
           Almost half visited their GP ten or more times before anyone joined the dots.
-          Maai helps you be harder to dismiss.
+          EndoHer helps you be harder to dismiss.
         </p>
       </div>
     </section>
@@ -293,12 +293,12 @@ const steps = [
   {
     icon: NotebookPen,
     title: "Describe it in your own words",
-    body: "Any level of detail. A sentence a day is enough. Maai never asks you to translate your body into a form.",
+    body: "Any level of detail. A sentence a day is enough. EndoHer never asks you to translate your body into a form.",
     tint: "pink",
   },
   {
     icon: Sparkles,
-    title: "Maai maps to clinical terms",
+    title: "EndoHer maps to clinical terms",
     body: "Your words are gently mapped to the vocabulary a doctor recognises. Nothing is diagnosed. Nothing is decided.",
     tint: "powder",
   },
@@ -314,7 +314,7 @@ function HowItWorks() {
   return (
     <section id="how" className="mx-auto max-w-6xl px-6 py-24">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">How Maai listens</p>
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">How EndoHer listens</p>
         <h2 className="mt-3 font-serif text-4xl leading-tight tracking-tight text-charcoal sm:text-5xl">
           The meaningful interval between things.
         </h2>
@@ -358,8 +358,8 @@ function HowItWorks() {
 
 function QuietPromise() {
   const promises = [
-    "Maai never draws conclusions.",
-    "Maai never replaces your clinician.",
+    "EndoHer never draws conclusions.",
+    "EndoHer never replaces your clinician.",
     "Your words are yours — export or delete, always.",
     "Log in the language your body speaks.",
   ];
@@ -372,8 +372,8 @@ function QuietPromise() {
             A record, never a diagnosis.
           </h2>
           <p className="mt-4 max-w-lg text-warm-grey">
-            Maai maps your words to clinical terms a doctor recognises — never replacing them,
-            never drawing conclusions. The clinician interprets. Maai helps you be heard.
+            EndoHer maps your words to clinical terms a doctor recognises — never replacing them,
+            never drawing conclusions. The clinician interprets. EndoHer helps you be heard.
           </p>
         </div>
         <ul className="space-y-3">
@@ -408,7 +408,7 @@ function Testimonial() {
         properly.”
       </blockquote>
       <div className="mt-6 text-sm text-warm-grey">
-        Anonymous · Maai user, 14 months to diagnosis
+        Anonymous · EndoHer user, 14 months to diagnosis
       </div>
     </section>
   );
@@ -463,7 +463,7 @@ function Footer() {
         </div>
         {[
           { title: "Product", items: ["How it works", "Languages", "Privacy"] },
-          { title: "For clinicians", items: ["The Maai record", "Research", "Contact"] },
+          { title: "For clinicians", items: ["The EndoHer record", "Research", "Contact"] },
           { title: "Legal", items: ["Privacy", "Terms", "Data & you"] },
         ].map((c) => (
           <div key={c.title}>
@@ -478,8 +478,8 @@ function Footer() {
       </div>
       <div className="border-t border-border/40">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-warm-grey">
-          <span>© {new Date().getFullYear()} Maai. Made with care.</span>
-          <span>Maai does not diagnose. Always consult a clinician.</span>
+          <span>© {new Date().getFullYear()} EndoHer. Made with care.</span>
+          <span>EndoHer does not diagnose. Always consult a clinician.</span>
         </div>
       </div>
     </footer>

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 export const Route = createFileRoute("/check-in")({
   head: () => ({
     meta: [
-      { title: "Daily check-in · Maai" },
+      { title: "Daily check-in · EndoHer" },
       { name: "description", content: "Log today's symptoms and see your burden score update in real time." },
       { name: "robots", content: "noindex" },
     ],

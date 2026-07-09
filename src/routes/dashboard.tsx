@@ -44,7 +44,7 @@ function logToSymptomKeys(log: {
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Daily log · Maai" },
+      { title: "Daily log · EndoHer" },
       { name: "description", content: "A calm daily check-in for endometriosis. Log today's pain, symptoms, and impact — see your patterns build over time." },
       { name: "robots", content: "noindex" },
     ],
@@ -457,8 +457,8 @@ function Dashboard() {
         <DailyLogSection onSave={saveLog} onGeneratedReport={() => setHistoryRefresh((k) => k + 1)} logs={logs} />
 
         <footer className="mt-12 pb-6 text-center text-xs" style={{ color: C.muted }}>
-          <p>Maai does not diagnose. Always consult a clinician.</p>
-          <p className="mt-1">© 2026 Maai. Made with care.</p>
+          <p>EndoHer does not diagnose. Always consult a clinician.</p>
+          <p className="mt-1">© 2026 EndoHer. Made with care.</p>
         </footer>
       </main>
       {showPathway && (
@@ -507,7 +507,7 @@ function PathwayModal({
           Where are you in your endometriosis journey?
         </h2>
         <p className="mt-2 text-sm" style={{ color: C.muted }}>
-          This helps Maai tailor what you see. You can change it any time.
+          This helps EndoHer tailor what you see. You can change it any time.
         </p>
 
         <div className="mt-5 grid gap-3">
@@ -571,7 +571,7 @@ export function TopBar({ current }: { current?: "daily" | "summary" } = {}) {
             M
           </div>
           <span style={{ fontFamily: "Fraunces, serif" }} className="text-lg tracking-tight">
-            Maai
+            EndoHer
           </span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -2480,7 +2480,7 @@ export function ReportPreviewCard({
         <div>
           <div className="flex items-baseline gap-1">
             <h2 className="text-3xl leading-none" style={{ fontFamily: serif, color: C.text }}>
-              Maai
+              EndoHer
             </h2>
             <span className="text-2xl leading-none" style={{ color: C.accent, fontFamily: serif }}>.</span>
           </div>
@@ -2651,7 +2651,7 @@ export function ReportPreviewCard({
 
       {/* Disclaimer */}
       <div className="mt-6 border-t pt-4 text-xs leading-relaxed" style={{ borderColor: C.border, color: C.muted }}>
-        Maai's score and flare thresholds are tracking aids modelled on validated instruments (NRS, EHP-5) — they are not diagnoses or clinically validated cutoffs. This summary reflects patient-reported data only and is intended to support, not replace, clinical assessment.
+        EndoHer's score and flare thresholds are tracking aids modelled on validated instruments (NRS, EHP-5) — they are not diagnoses or clinically validated cutoffs. This summary reflects patient-reported data only and is intended to support, not replace, clinical assessment.
       </div>
 
     </SoftCard>
