@@ -725,7 +725,7 @@ function PainTooltip({ value, pct, visible }: { value: number; pct: number; visi
         <div
           className="absolute"
           style={{
-            left: `clamp(100px, ${pct}%, calc(100% - 100px))`,
+            left: `${pct}%`,
             bottom: 12,
             transform: "translateX(-50%)",
             maxWidth: 200,
@@ -743,10 +743,10 @@ function PainTooltip({ value, pct, visible }: { value: number; pct: number; visi
               boxShadow: "0 6px 18px rgba(59,31,43,0.12)",
             }}
           >
-            <p className="text-[13px] font-semibold leading-tight" style={{ color: "#3B1F2B" }}>
+            <p className="text-center text-[13px] font-semibold leading-tight" style={{ color: "#3B1F2B" }}>
               Pain {value} out of 10
             </p>
-            <p className="mt-1 text-[12px] leading-snug" style={{ color: "#5A3B48" }}>
+            <p className="mt-1 text-center text-[12px] leading-snug" style={{ color: "#5A3B48" }}>
               {PAIN_TOOLTIP_MESSAGES[value]}
             </p>
           </div>
