@@ -9,18 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProcessRouteImport } from './routes/api/process'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as ApiReportsIndexRouteImport } from './routes/api/reports/index'
 import { Route as ApiReportsIdRouteImport } from './routes/api/reports/$id'
 import { Route as ApiReportsIdPdfRouteImport } from './routes/api/reports/$id/pdf'
 
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -29,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiProcessRoute = ApiProcessRouteImport.update({
   id: '/api/process',
   path: '/api/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/_authenticated/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReportsIndexRoute = ApiReportsIndexRouteImport.update({
@@ -49,7 +49,7 @@ const ApiReportsIdPdfRoute = ApiReportsIdPdfRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports/': typeof ApiReportsIndexRoute
@@ -57,7 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports': typeof ApiReportsIndexRoute
@@ -66,7 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
   '/api/reports/': typeof ApiReportsIndexRoute
@@ -92,7 +92,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/dashboard'
+    | '/_authenticated/dashboard'
     | '/api/process'
     | '/api/reports/$id'
     | '/api/reports/'
@@ -101,7 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   ApiProcessRoute: typeof ApiProcessRoute
   ApiReportsIdRoute: typeof ApiReportsIdRouteWithChildren
   ApiReportsIndexRoute: typeof ApiReportsIndexRoute
@@ -109,13 +109,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -128,6 +121,13 @@ declare module '@tanstack/react-router' {
       path: '/api/process'
       fullPath: '/api/process'
       preLoaderRoute: typeof ApiProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/reports/': {
@@ -168,7 +168,7 @@ const ApiReportsIdRouteWithChildren = ApiReportsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   ApiProcessRoute: ApiProcessRoute,
   ApiReportsIdRoute: ApiReportsIdRouteWithChildren,
   ApiReportsIndexRoute: ApiReportsIndexRoute,
