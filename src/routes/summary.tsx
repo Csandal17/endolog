@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { readLogs, TopBar, ReportPreviewCard, ReportHistoryCard } from "./dashboard";
+import { readLogs, TopBar, PainTrendCard, ReportPreviewCard, ReportHistoryCard } from "./dashboard";
 
 export const Route = createFileRoute("/summary")({
   head: () => ({
     meta: [
       { title: "Summary · Maai" },
-      { name: "description", content: "Your clinician-ready report preview and generated report history." },
+      { name: "description", content: "Your summary notes for doctors, pain trend, and generated report history." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -42,11 +42,15 @@ function SummaryPage() {
             Your report and history.
           </h1>
           <p className="mt-2 text-sm" style={{ color: "#646059" }}>
-            A clinician-friendly preview built from your daily logs, plus every report you've generated.
+            Summary notes for doctors, pain trend over time, and every report you've generated.
           </p>
         </header>
 
         <section>
+          <PainTrendCard logs={logs} />
+        </section>
+
+        <section className="mt-8">
           <ReportPreviewCard logs={logs} onGenerated={() => setRefresh((k) => k + 1)} />
         </section>
 

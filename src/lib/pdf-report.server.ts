@@ -52,7 +52,7 @@ export function renderReportPdf(report: StructuredReport): Uint8Array {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Maai clinical record", margin, y);
+  doc.text("Maai — Summary notes for doctors", margin, y);
   y += 24;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);

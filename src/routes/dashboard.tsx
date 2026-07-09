@@ -42,8 +42,11 @@ const C = {
   deep: "#141210",     // charcoal for text on accent
   light: "#FBE9B8",    // soft butter for highlights
   pink: "#F5B8DB",
-  green: "#D6E1B4",    // sage tint
+  green: "#9AAB63",    // sage green (bolder for severity dot)
+  greenSoft: "#D6E1B4",// sage tint (for backgrounds/chips)
   blue: "#B6CAEB",     // powder blue
+  red: "#B8443A",      // deep warm red for severe / flare
+  redSoft: "#F4D7D2",  // red tint for backgrounds
 };
 
 // ---------------- Data model ----------------
@@ -169,10 +172,10 @@ function calcScore(input: {
 }
 
 function severityColor(s: ScoreBreakdown["severity"]): string {
-  if (s === "No symptoms") return C.green;
-  if (s === "Mild") return C.blue;
+  if (s === "No symptoms") return C.greenSoft;
+  if (s === "Mild") return C.green;
   if (s === "Moderate") return C.light;
-  return C.pink;
+  return C.red;
 }
 
 // ---------------- Flare logic ----------------
@@ -362,10 +365,6 @@ function Dashboard() {
 
         <section className="mb-8">
           <WeeklyLog logs={logs} onDelete={deleteLog} onClear={clearLogs} />
-        </section>
-
-        <section className="mb-8">
-          <PainTrendCard logs={logs} />
         </section>
 
         <DailyLogSection onSave={saveLog} onGeneratedReport={() => setHistoryRefresh((k) => k + 1)} logs={logs} />
@@ -1122,7 +1121,7 @@ function LegendItem({ icon, children }: { icon: React.ReactNode; children: React
 
 type TrendRange = "week" | "month" | "year";
 
-function PainTrendCard({ logs }: { logs: DailyLog[] }) {
+export function PainTrendCard({ logs }: { logs: DailyLog[] }) {
   const [range, setRange] = useState<TrendRange>("week");
   const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
   const points = useMemo(() => buildTrendPoints(logs, range, flare.ids), [logs, range, flare.ids]);
@@ -1347,8 +1346,8 @@ function LineChart({ points }: { points: TrendPoint[] }) {
                 cx={xFor(i)}
                 cy={yFor(p.value)}
                 r={p.flare ? 6 : 4}
-                fill={p.flare ? C.accent : "#fff"}
-                stroke={C.deep}
+                fill={p.flare ? C.red : "#fff"}
+                stroke={p.flare ? C.red : C.deep}
                 strokeWidth={p.flare ? 3 : 1.5}
               />
             </g>
@@ -1385,7 +1384,7 @@ function LineChart({ points }: { points: TrendPoint[] }) {
         <span className="inline-flex items-center gap-1.5">
           <span
             className="inline-block h-3 w-3 rounded-full border-[2px]"
-            style={{ borderColor: C.deep, background: C.accent }}
+            style={{ borderColor: C.red, background: C.red }}
           />
           Flare episode
         </span>
@@ -1684,16 +1683,7 @@ export function ReportPreviewCard({
     const peak = Math.max(...logs.map((l) => l.burden));
     const painDays = logs.filter((l) => l.pain > 0).length;
     const topSymptoms = recurringTerms(logs).slice(0, 5);
-    const impactCounts = { 0: 0, 15: 0, 25: 0 } as Record<number, number>;
-    logs.forEach((l) => {
-      if (l.impactChosen) impactCounts[l.impact] += 1;
-    });
-    const medCounts: Record<string, number> = {};
-    logs.forEach((l) => {
-      if (l.medicationEffect) medCounts[l.medicationEffect] = (medCounts[l.medicationEffect] ?? 0) + 1;
-    });
-
-    const { episodes } = flareEpisodeIds(logs);
+    const { ids: flareIds, episodes } = flareEpisodeIds(logs);
     const longest = episodes.reduce((m, e) => Math.max(m, e.length), 0);
     let aboveThreshold = 0;
     const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
@@ -1702,8 +1692,95 @@ export function ReportPreviewCard({
       const t = flareThreshold(baseline);
       if (t != null && l.burden > t) aboveThreshold += 1;
     }
+    // Average pain (0-10) — closest we have to "reported baseline pain"
+    const avgPain = (
+      logs.reduce((a, l) => a + l.pain, 0) / logs.length
+    ).toFixed(1);
 
-    return { avg, peak, painDays, topSymptoms, impactCounts, medCounts, episodes: episodes.length, longest, aboveThreshold };
+    // Detailed flare episode rows
+    const episodeRows = episodes.map((ids) => {
+      const entries = sorted.filter((l) => ids.includes(l.id));
+      const start = entries[0].date;
+      const end = entries[entries.length - 1].date;
+      const duration = daysBetween(start, end) + 1;
+      const peakScore = Math.max(...entries.map((l) => l.burden));
+      return { start, end, duration, peak: peakScore };
+    });
+
+    // Safety flags — patient-reported symptoms worth prompt review
+    const flagged: string[] = [];
+    if (logs.some((l) => l.wholeBody.includes("Dizziness"))) flagged.push("Dizziness");
+    if (logs.filter((l) => l.bleedingUnexpected).length >= 2)
+      flagged.push("Recurrent unexpected bleeding");
+    if (logs.some((l) => l.pain >= 9)) flagged.push("Pain rated 9–10 on one or more days");
+
+    // 14-day trend narrative
+    const now = new Date();
+    const startThis = new Date(now); startThis.setDate(startThis.getDate() - 6);
+    const startPrev = new Date(startThis); startPrev.setDate(startPrev.getDate() - 7);
+    const endPrev = new Date(startThis); endPrev.setDate(endPrev.getDate() - 1);
+    const inRange = (l: DailyLog, s: Date, e: Date) => {
+      const d = new Date(l.date);
+      return d >= s && d <= e;
+    };
+    const thisWeek = logs.filter((l) => inRange(l, startThis, now));
+    const prevWeek = logs.filter((l) => inRange(l, startPrev, endPrev));
+    const avgOf = (arr: DailyLog[]) =>
+      arr.length ? Math.round(arr.reduce((a, l) => a + l.burden, 0) / arr.length) : null;
+    const topSymOf = (arr: DailyLog[]) => {
+      const c = new Map<string, number>();
+      for (const l of arr) for (const s of l.wholeBody) c.set(s, (c.get(s) ?? 0) + 1);
+      let top: { term: string; count: number } | null = null;
+      for (const [term, count] of c.entries()) {
+        if (!top || count > top.count) top = { term, count };
+      }
+      return top;
+    };
+    const thisAvg = avgOf(thisWeek);
+    const prevAvg = avgOf(prevWeek);
+    const trend = {
+      thisRange: `${fmtShort(startThis)} to ${fmtShort(now)}`,
+      prevRange: `${fmtShort(startPrev)} to ${fmtShort(endPrev)}`,
+      thisAvg, prevAvg,
+      delta: thisAvg != null && prevAvg != null ? thisAvg - prevAvg : null,
+      thisDaysAbove: countAboveThreshold(thisWeek, sorted),
+      prevDaysAbove: countAboveThreshold(prevWeek, sorted),
+      thisTop: topSymOf(thisWeek),
+      prevTop: topSymOf(prevWeek),
+      thisCount: thisWeek.length,
+      prevCount: prevWeek.length,
+    };
+
+    // Burden series (last 30 days) for mini-chart
+    const burdenPoints: { date: string; burden: number | null; severity: ScoreBreakdown["severity"] | null; flare: boolean }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const key = dateKey(d);
+      const match = logs.find((l) => l.date === key);
+      if (match) {
+        const sc = calcScore({
+          pain: match.pain,
+          siteDescriptors: match.siteDescriptors,
+          wholeBody: match.wholeBody,
+          bleedingUnexpected: match.bleedingUnexpected,
+          impact: match.impactChosen ? match.impact : 0,
+        });
+        burdenPoints.push({ date: key, burden: match.burden, severity: sc.severity, flare: flareIds.has(match.id) });
+      } else {
+        burdenPoints.push({ date: key, burden: null, severity: null, flare: false });
+      }
+    }
+
+    // Overall report dates
+    const firstDate = sorted[0].date;
+    const lastDate = sorted[sorted.length - 1].date;
+    const currentThreshold = flareThreshold(computeBaseline(sorted, dateKey(now)).baseline);
+
+    return {
+      avg, peak, painDays, topSymptoms, episodes: episodes.length, longest,
+      aboveThreshold, avgPain, episodeRows, flagged, trend, burdenPoints,
+      firstDate, lastDate, currentThreshold,
+    };
   }, [logs]);
 
   async function generate() {
@@ -1725,99 +1802,429 @@ export function ReportPreviewCard({
     }
   }
 
-  return (
-    <SoftCard id="report-preview">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
-          Report preview
-        </h2>
-        <FileText className="h-5 w-5" style={{ color: C.muted }} />
-      </div>
+  const serif = "Fraunces, DM Serif Display, Georgia, serif";
 
-      {!stats ? (
+  if (!stats) {
+    return (
+      <SoftCard id="report-preview">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-2xl" style={{ fontFamily: serif, color: C.text }}>
+            Summary notes for doctors
+          </h2>
+          <FileText className="h-5 w-5" style={{ color: C.muted }} />
+        </div>
         <div
           className="mt-4 rounded-2xl border border-dashed py-10 text-center text-sm"
           style={{ borderColor: C.border, color: C.muted, background: C.bg }}
         >
-          Log at least one day to see your clinician-friendly summary.
+          Log at least one day to see your summary notes for doctors.
         </div>
-      ) : (
-        <>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile label="Logged days" value={logs.length} />
-            <StatTile label="Average burden" value={stats.avg} />
-            <StatTile label="Peak burden" value={stats.peak} />
-            <StatTile label="Pain days" value={stats.painDays} />
-            <StatTile label="Flare episodes" value={stats.episodes} />
-            <StatTile label="Longest flare" value={`${stats.longest}d`} />
-            <StatTile label="Days above threshold" value={stats.aboveThreshold} />
-            <StatTile
-              label="Impact"
-              value={`${stats.impactCounts[0] || 0}/${stats.impactCounts[15] || 0}/${stats.impactCounts[25] || 0}`}
-              hint="none / some / most"
-            />
+      </SoftCard>
+    );
+  }
+
+  const today = new Date();
+  const generatedOn = today.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  const covers = `${new Date(stats.firstDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} – ${new Date(stats.lastDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
+
+  return (
+    <SoftCard id="report-preview">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 pb-5" style={{ borderBottom: `2px solid ${C.text}` }}>
+        <div>
+          <div className="flex items-baseline gap-1">
+            <h2 className="text-3xl leading-none" style={{ fontFamily: serif, color: C.text }}>
+              Maai
+            </h2>
+            <span className="text-2xl leading-none" style={{ color: C.accent, fontFamily: serif }}>.</span>
           </div>
+          <p className="mt-1 text-sm" style={{ color: C.muted }}>
+            Summary notes for doctors — prepared for clinical review
+          </p>
+        </div>
+        <div className="text-right text-sm" style={{ color: C.muted }}>
+          <div>Report generated <span className="font-semibold" style={{ color: C.text }}>{generatedOn}</span></div>
+          <div>Covers <span className="font-semibold" style={{ color: C.text }}>{covers}</span></div>
+        </div>
+      </div>
 
-          <div className="mt-5">
-            <SectionLabel>Most common symptoms</SectionLabel>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {stats.topSymptoms.map((s) => (
-                <span
-                  key={s.term}
-                  className="rounded-full px-3 py-1 text-xs"
-                  style={{ background: C.blue, color: C.text }}
-                >
-                  {s.term} · {s.count}
-                </span>
-              ))}
-            </div>
+      {/* Patient tile */}
+      <div className="mt-6 rounded-2xl p-5" style={{ background: C.bg }}>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+          <PatientField label="Patient" value="You" />
+          <PatientField label="Days logged" value={`${logs.length} / ${daysBetween(stats.firstDate, stats.lastDate) + 1}`} />
+          <PatientField label="Report window" value={`${daysBetween(stats.firstDate, stats.lastDate) + 1} days`} />
+        </div>
+      </div>
+
+      {/* Safety flags */}
+      {stats.flagged.length > 0 && (
+        <div className="mt-6 rounded-2xl border-2 p-4" style={{ borderColor: C.red, background: C.redSoft }}>
+          <div className="text-sm font-semibold" style={{ color: C.red }}>
+            ⚠ Patient-reported safety flags — recommend prompt clinical review
           </div>
-
-          {Object.keys(stats.medCounts).length > 0 && (
-            <div className="mt-5">
-              <SectionLabel>Medication response</SectionLabel>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {Object.entries(stats.medCounts).map(([k, v]) => (
-                  <span
-                    key={k}
-                    className="rounded-full px-3 py-1 text-xs"
-                    style={{ background: C.green, color: C.text }}
-                  >
-                    {k} · {v}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5">
-            <SectionLabel>Recent pattern</SectionLabel>
-            <ul className="mt-2 space-y-1 text-sm" style={{ color: C.text }}>
-              {logs.slice(0, 5).map((l) => (
-                <li key={l.id}>
-                  <span style={{ color: C.muted }}>
-                    {new Date(l.date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}:
-                  </span>{" "}
-                  burden {l.burden}, {summarise(l)}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-2xl p-3 text-sm" style={{ background: C.pink, color: C.text }}>
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6 flex justify-end">
-            <PrimaryButton onClick={generate} disabled={submitting}>
-              {submitting ? "Generating…" : "Generate report"}
-            </PrimaryButton>
-          </div>
-        </>
+          <ul className="mt-2 space-y-1 text-sm" style={{ color: C.red }}>
+            {stats.flagged.map((f) => (
+              <li key={f}>• {f}</li>
+            ))}
+          </ul>
+        </div>
       )}
+
+      {/* Snapshot */}
+      <ReportSection title="Snapshot" serif={serif}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SnapshotTile value={`${stats.avgPain}/10`} label="Average reported pain" />
+          <SnapshotTile value={stats.avg} label="Tracked burden baseline" />
+          <SnapshotTile value={stats.episodes} label="Confirmed flare episodes" />
+          <SnapshotTile value={`${stats.longest}d`} label="Longest flare episode" />
+        </div>
+      </ReportSection>
+
+      {/* Symptom burden 30d chart */}
+      <ReportSection title="Symptom burden — last 30 days" serif={serif}>
+        <BurdenMiniChart points={stats.burdenPoints} threshold={stats.currentThreshold} />
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" style={{ color: C.muted }}>
+          <SwatchLegend color={C.green} label="Mild" />
+          <SwatchLegend color={C.light} label="Moderate" />
+          <SwatchLegend color={C.red} label="Severe" />
+          <SwatchLegend color={C.border} label="Unlogged" hollow />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-[2px] w-6" style={{ background: C.accent }} />
+            Flare threshold (current)
+          </span>
+        </div>
+      </ReportSection>
+
+      {/* Confirmed flare episodes table */}
+      <ReportSection title="Confirmed flare episodes" serif={serif}>
+        {stats.episodeRows.length === 0 ? (
+          <p className="text-sm" style={{ color: C.muted }}>
+            No confirmed flare episodes in this report window.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr style={{ color: C.muted }} className="text-xs uppercase tracking-[0.18em]">
+                  <th className="py-2 pr-4 font-semibold">Start</th>
+                  <th className="py-2 pr-4 font-semibold">End</th>
+                  <th className="py-2 pr-4 font-semibold">Duration</th>
+                  <th className="py-2 font-semibold">Peak score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.episodeRows.map((e, i) => (
+                  <tr key={i} style={{ borderTop: `1px solid ${C.border}`, color: C.text }}>
+                    <td className="py-3 pr-4">{new Date(e.start).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</td>
+                    <td className="py-3 pr-4">{new Date(e.end).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</td>
+                    <td className="py-3 pr-4">{e.duration} {e.duration === 1 ? "day" : "days"}</td>
+                    <td className="py-3 font-semibold">{e.peak}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </ReportSection>
+
+      {/* Symptom trend narrative */}
+      <ReportSection title="Symptom trend — last 14 days" serif={serif}>
+        <p className="text-sm leading-relaxed" style={{ color: C.text }}>
+          {stats.trend.thisCount} of the last 7 days were logged this week
+          {stats.trend.prevCount > 0 ? `, and ${stats.trend.prevCount} the week before` : ""}.
+          {stats.trend.thisAvg != null && stats.trend.prevAvg != null && stats.trend.delta != null && (
+            <> Average burden score is trending {stats.trend.delta > 0 ? "upward" : stats.trend.delta < 0 ? "downward" : "flat"} week-on-week — <strong>{stats.trend.thisAvg}</strong> this week vs <strong>{stats.trend.prevAvg}</strong> the week before.</>
+          )}
+          {stats.trend.thisAvg == null && " Not enough data this week to compute a weekly average."}
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <TrendMiniCard
+            label={`This week — ${stats.trend.thisRange}`}
+            avg={stats.trend.thisAvg}
+            delta={stats.trend.delta}
+            daysAbove={stats.trend.thisDaysAbove}
+            total={stats.trend.thisCount}
+            top={stats.trend.thisTop}
+          />
+          <TrendMiniCard
+            label={`Prior week — ${stats.trend.prevRange}`}
+            avg={stats.trend.prevAvg}
+            delta={null}
+            daysAbove={stats.trend.prevDaysAbove}
+            total={stats.trend.prevCount}
+            top={stats.trend.prevTop}
+          />
+        </div>
+      </ReportSection>
+
+      {/* Most reported symptoms */}
+      {stats.topSymptoms.length > 0 && (
+        <ReportSection title="Most reported symptoms" serif={serif}>
+          <div className="flex flex-wrap gap-2">
+            {stats.topSymptoms.map((s) => (
+              <span key={s.term} className="rounded-full px-3 py-1 text-xs" style={{ background: C.blue, color: C.text }}>
+                {s.term} · {s.count}
+              </span>
+            ))}
+          </div>
+        </ReportSection>
+      )}
+
+      {/* Disclaimer */}
+      <div className="mt-6 border-t pt-4 text-xs leading-relaxed" style={{ borderColor: C.border, color: C.muted }}>
+        Maai's score and flare thresholds are tracking aids modelled on validated instruments (NRS, EHP-5) — they are not diagnoses or clinically validated cutoffs. This summary reflects patient-reported data only and is intended to support, not replace, clinical assessment.
+      </div>
+
+      {error && (
+        <div className="mt-4 rounded-2xl p-3 text-sm" style={{ background: C.redSoft, color: C.red }}>
+          {error}
+        </div>
+      )}
+
+      <div className="mt-6 flex justify-end">
+        <PrimaryButton onClick={generate} disabled={submitting}>
+          {submitting ? "Generating…" : "Generate report"}
+        </PrimaryButton>
+      </div>
     </SoftCard>
+  );
+}
+
+function fmtShort(d: Date): string {
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function countAboveThreshold(entries: DailyLog[], allSorted: DailyLog[]): { count: number; total: number } {
+  let count = 0;
+  for (const l of entries) {
+    const { baseline } = computeBaseline(allSorted, l.date);
+    const t = flareThreshold(baseline);
+    if (t != null && l.burden > t) count += 1;
+  }
+  return { count, total: entries.length };
+}
+
+function PatientField({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: C.muted }}>
+        {label}
+      </div>
+      <div className="mt-1 text-lg" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ReportSection({
+  title,
+  serif,
+  children,
+}: {
+  title: string;
+  serif: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-8">
+      <h3 className="text-xl" style={{ fontFamily: serif, color: C.text }}>{title}</h3>
+      <div className="mt-3 border-t pt-4" style={{ borderColor: C.border }}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function SnapshotTile({ value, label }: { value: number | string; label: string }) {
+  return (
+    <div className="rounded-2xl border p-4" style={{ borderColor: C.border, background: "#fff" }}>
+      <div className="text-3xl leading-none" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        {value}
+      </div>
+      <div className="mt-2 text-xs" style={{ color: C.muted }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function SwatchLegend({ color, label, hollow = false }: { color: string; label: string; hollow?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full"
+        style={{ background: hollow ? "transparent" : color, border: `1.5px solid ${color}` }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function TrendMiniCard({
+  label,
+  avg,
+  delta,
+  daysAbove,
+  total,
+  top,
+}: {
+  label: string;
+  avg: number | null;
+  delta: number | null;
+  daysAbove: { count: number; total: number };
+  total: number;
+  top: { term: string; count: number } | null;
+}) {
+  return (
+    <div className="rounded-2xl border p-4" style={{ borderColor: C.border, background: C.bg }}>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: C.muted }}>
+        {label}
+      </div>
+      <dl className="mt-3 space-y-2 text-sm">
+        <TrendRow k="Avg burden score">
+          {avg == null ? "—" : (
+            <>
+              <span className="font-semibold">{avg}</span>
+              {delta != null && delta !== 0 && (
+                <span className="ml-1" style={{ color: delta > 0 ? C.red : C.green }}>
+                  ({delta > 0 ? "+" : ""}{delta})
+                </span>
+              )}
+            </>
+          )}
+        </TrendRow>
+        <TrendRow k="Days above typical range">
+          <span className="font-semibold">{daysAbove.count}/{total || 7}</span>
+        </TrendRow>
+        <TrendRow k="Most reported symptom">
+          {top ? (
+            <span className="font-semibold">{top.term} ({top.count}d)</span>
+          ) : (
+            <span style={{ color: C.muted }}>—</span>
+          )}
+        </TrendRow>
+      </dl>
+    </div>
+  );
+}
+
+function TrendRow({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b pb-1.5" style={{ borderColor: C.border, color: C.text }}>
+      <dt style={{ color: C.muted }}>{k}</dt>
+      <dd className="text-right">{children}</dd>
+    </div>
+  );
+}
+
+function BurdenMiniChart({
+  points,
+  threshold,
+}: {
+  points: { date: string; burden: number | null; severity: ScoreBreakdown["severity"] | null; flare: boolean }[];
+  threshold: number | null;
+}) {
+  const W = 720;
+  const H = 200;
+  const padL = 32, padR = 12, padT = 12, padB = 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = points.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0;
+  const yFor = (v: number) => padT + innerH - (v / 100) * innerH;
+  const xFor = (i: number) => padL + i * stepX;
+
+  const segments: string[] = [];
+  let current: string[] = [];
+  points.forEach((p, i) => {
+    if (p.burden == null) {
+      if (current.length) segments.push(current.join(" "));
+      current = [];
+    } else {
+      const cmd = current.length === 0 ? "M" : "L";
+      current.push(`${cmd}${xFor(i).toFixed(1)},${yFor(p.burden).toFixed(1)}`);
+    }
+  });
+  if (current.length) segments.push(current.join(" "));
+
+  // flare bands: contiguous runs of p.flare
+  const bands: { x1: number; x2: number }[] = [];
+  let bstart = -1;
+  for (let i = 0; i < n; i++) {
+    if (points[i].flare && bstart === -1) bstart = i;
+    if ((!points[i].flare || i === n - 1) && bstart !== -1) {
+      const end = points[i].flare ? i : i - 1;
+      bands.push({ x1: xFor(bstart) - 8, x2: xFor(end) + 8 });
+      bstart = -1;
+    }
+  }
+
+  const dotColor = (sev: ScoreBreakdown["severity"] | null) => {
+    if (!sev) return C.border;
+    if (sev === "Mild") return C.green;
+    if (sev === "Moderate") return C.light;
+    return C.red;
+  };
+
+  // x-axis labels every ~5 days
+  const labelIdx = [0, 7, 14, 21, 29].filter((i) => i < n);
+
+  return (
+    <div
+      className="rounded-2xl border p-3"
+      style={{ borderColor: C.border, background: "#fff" }}
+    >
+      <div className="w-full overflow-x-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full min-w-[520px]" role="img" aria-label="Symptom burden last 30 days">
+          {/* flare bands */}
+          {bands.map((b, i) => (
+            <rect key={i} x={b.x1} y={padT} width={b.x2 - b.x1} height={innerH} fill={C.light} opacity={0.55} rx={6} />
+          ))}
+          {/* threshold line */}
+          {threshold != null && (
+            <line
+              x1={padL}
+              x2={W - padR}
+              y1={yFor(threshold)}
+              y2={yFor(threshold)}
+              stroke={C.accent}
+              strokeWidth={2}
+              strokeDasharray="6 5"
+            />
+          )}
+          {/* line */}
+          {segments.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke={C.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          ))}
+          {/* points */}
+          {points.map((p, i) =>
+            p.burden == null ? null : (
+              <circle
+                key={i}
+                cx={xFor(i)}
+                cy={yFor(p.burden)}
+                r={p.flare ? 5 : 4}
+                fill={dotColor(p.severity)}
+                stroke={p.flare ? C.text : "none"}
+                strokeWidth={p.flare ? 2 : 0}
+              />
+            ),
+          )}
+          {/* x labels */}
+          {labelIdx.map((i) => {
+            const d = new Date(points[i].date);
+            return (
+              <text key={i} x={xFor(i)} y={H - 8} fontSize="10" textAnchor="middle" fill={C.muted} fontFamily="Karla, sans-serif">
+                {d.getDate()}/{d.getMonth() + 1}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
   );
 }
 
@@ -2139,7 +2546,7 @@ function Flower({
           rx="12"
           ry="18"
           fill={fill}
-          stroke={outlined ? C.deep : "none"}
+          stroke={outlined ? C.red : "none"}
           strokeWidth={outlined ? 3.5 : 0}
           strokeLinejoin="round"
           transform={`rotate(${r} 50 50)`}
@@ -2149,8 +2556,8 @@ function Flower({
         cx="50"
         cy="50"
         r="10"
-        fill={C.deep}
-        stroke={outlined ? C.deep : "none"}
+        fill={outlined ? C.red : C.deep}
+        stroke={outlined ? C.red : "none"}
         strokeWidth={outlined ? 3.5 : 0}
       />
     </svg>
