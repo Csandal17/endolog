@@ -1013,6 +1013,16 @@ function Step2({
         />
       </div>
 
+      {(() => {
+        const keys = logToSymptomKeys(log);
+        if (keys.length === 0) return null;
+        return (
+          <div className="mt-6">
+            <EmpathyBanner symptom={keys[0]} />
+          </div>
+        );
+      })()}
+
       <div className="mt-8 flex justify-between">
         <GhostButton onClick={onBack}>Back</GhostButton>
         <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
