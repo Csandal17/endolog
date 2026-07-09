@@ -140,6 +140,8 @@ interface BannerContent {
   message: string;
 }
 
+type BannerData = { key: string; stat: string; message: string } | null;
+
 function getPainBanner(score: number): BannerContent {
   if (score === 0) {
     return {
