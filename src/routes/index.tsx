@@ -499,6 +499,49 @@ function CTA() {
 }
 
 function Footer() {
+  return _Footer();
+}
+
+function BrandMark() {
+  return (
+    <section className="mx-auto max-w-6xl px-6 pb-16">
+      <div
+        className="grid grid-cols-1 items-center gap-8 rounded-[2rem] border border-border/60 bg-card p-8 sm:p-10 md:grid-cols-[auto_1fr]"
+      >
+        <div className="flex items-center justify-center">
+          <img
+            src={endoherLogo}
+            alt="EndoHer brand mark"
+            width={120}
+            height={120}
+            className="h-28 w-28 rounded-3xl shadow-sm"
+            loading="lazy"
+          />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-warm-grey">
+            Brand guideline
+          </p>
+          <h3 className="mt-2 font-serif text-2xl leading-tight tracking-tight text-charcoal sm:text-3xl">
+            The EndoHer mark.
+          </h3>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-warm-grey">
+            A soft lavender badge with a serif E cradling a quiet silhouette. It stands for
+            being seen, heard, and taken seriously. Always paired with the EndoHer wordmark set
+            in Fraunces.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-warm-grey">
+            <span className="rounded-full border border-border/60 bg-background px-3 py-1">Primary · #D098E4</span>
+            <span className="rounded-full border border-border/60 bg-background px-3 py-1">Parchment mark</span>
+            <span className="rounded-full border border-border/60 bg-background px-3 py-1">Fraunces wordmark</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function _Footer() {
   return (
     <footer className="border-t border-border/40 bg-background">
       <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 py-14 text-sm md:grid-cols-4">
