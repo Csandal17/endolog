@@ -498,7 +498,6 @@ function Dashboard() {
   const setSocrates = (patch: Partial<SocratesAnswers>) =>
     setForm((f) => ({ ...f, socrates: { ...f.socrates, ...patch } }));
 
-  type BannerData = { key: string; stat: string; message: string } | null;
   const [banner, setBanner] = useState<BannerData>(null);
 
   async function submit(e: React.FormEvent) {
