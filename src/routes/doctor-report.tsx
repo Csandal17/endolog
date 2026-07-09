@@ -1,9 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { readLogs, ReportPreviewCard } from "./dashboard";
 
+const RANGE_LABELS: Record<string, { label: string; days: number | null }> = {
+  "7": { label: "Last 7 days", days: 7 },
+  "30": { label: "Last 30 days", days: 30 },
+  "90": { label: "Last 90 days", days: 90 },
+  "all": { label: "All time", days: null },
+};
+
+const searchSchema = z.object({
+  range: fallback(z.string(), "30").default("30"),
+});
+
 export const Route = createFileRoute("/doctor-report")({
+  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "Doctor report · Maai" },
@@ -15,10 +29,20 @@ export const Route = createFileRoute("/doctor-report")({
 });
 
 function DoctorReportPage() {
+  const { range } = Route.useSearch();
+  const rangeInfo = RANGE_LABELS[range] ?? RANGE_LABELS["30"];
   const [logs, setLogs] = useState<ReturnType<typeof readLogs>>([]);
   useEffect(() => {
     setLogs(readLogs());
   }, []);
+
+  const filteredLogs = useMemo(() => {
+    if (rangeInfo.days == null) return logs;
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - (rangeInfo.days - 1));
+    return logs.filter((l) => new Date(l.date) >= cutoff);
+  }, [logs, rangeInfo.days]);
 
   return (
     <div
@@ -44,7 +68,7 @@ function DoctorReportPage() {
         </Link>
         <div className="flex items-center gap-3">
           <p className="hidden text-xs sm:block" style={{ color: "#646059" }}>
-            Preview — use Print to save as PDF for your appointment.
+            {rangeInfo.label} · Use Print to save as PDF for your appointment.
           </p>
           <button
             type="button"
@@ -59,7 +83,7 @@ function DoctorReportPage() {
       </div>
 
       <main className="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
-        <ReportPreviewCard logs={logs} onGenerated={() => {}} />
+        <ReportPreviewCard logs={filteredLogs} onGenerated={() => {}} />
       </main>
     </div>
   );

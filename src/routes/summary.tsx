@@ -1,8 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
-import { readLogs, TopBar, PainTrendCard, ReportPreviewCard, ReportHistoryCard } from "./dashboard";
+import { readLogs, TopBar, PainTrendCard, ReportHistoryCard } from "./dashboard";
+
+type RangeKey = "7" | "30" | "90" | "all";
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: "7", label: "Last 7 days" },
+  { key: "30", label: "Last 30 days" },
+  { key: "90", label: "Last 90 days" },
+  { key: "all", label: "All time" },
+];
 
 export const Route = createFileRoute("/summary")({
   head: () => ({
@@ -17,7 +24,7 @@ export const Route = createFileRoute("/summary")({
 
 function SummaryPage() {
   const [logs, setLogs] = useState<ReturnType<typeof readLogs>>([]);
-  const [refresh, setRefresh] = useState(0);
+  const [range, setRange] = useState<RangeKey>("30");
 
   useEffect(() => {
     setLogs(readLogs());
@@ -54,7 +61,7 @@ function SummaryPage() {
 
         <section className="mt-8">
           <div
-            className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border p-5 sm:p-6"
+            className="rounded-3xl border p-5 sm:p-6"
             style={{ background: "#FFFFFF", borderColor: "#E8DFD1" }}
           >
             <div className="min-w-0">
@@ -65,27 +72,58 @@ function SummaryPage() {
                 Generate a report for your doctor
               </h2>
               <p className="mt-1 text-sm" style={{ color: "#646059" }}>
-                A print-ready summary of your patterns, flare episodes and trends — ready to bring
-                to your appointment.
+                Choose which time period to include. The report will use only logs from that
+                window.
               </p>
             </div>
-            <Link
-              to="/doctor-report"
-              className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
-              style={{ background: "#F5B8DB", color: "#141210" }}
-            >
-              <FileText className="h-4 w-4" />
-              Generate report for doctor
-            </Link>
+
+            <div className="mt-5">
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+                style={{ color: "#646059" }}
+              >
+                Time period
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {RANGE_OPTIONS.map((opt) => {
+                  const selected = range === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setRange(opt.key)}
+                      aria-pressed={selected}
+                      className="rounded-full border px-4 py-1.5 text-sm transition"
+                      style={{
+                        borderColor: selected ? "#141210" : "#E8DFD1",
+                        background: selected ? "#FBE9B8" : "#FFFFFF",
+                        color: "#141210",
+                        fontWeight: selected ? 600 : 500,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Link
+                to="/doctor-report"
+                search={{ range }}
+                className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+                style={{ background: "#F5B8DB", color: "#141210" }}
+              >
+                <FileText className="h-4 w-4" />
+                Generate report for doctor
+              </Link>
+            </div>
           </div>
         </section>
 
         <section className="mt-8">
-          <ReportPreviewCard logs={logs} onGenerated={() => setRefresh((k) => k + 1)} />
-        </section>
-
-        <section className="mt-8">
-          <ReportHistoryCard refreshKey={refresh} />
+          <ReportHistoryCard refreshKey={0} />
         </section>
       </main>
     </div>
