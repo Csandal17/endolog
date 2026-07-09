@@ -47,7 +47,33 @@ const C = {
   blue: "#B6CAEB",     // powder blue
   red: "#B8443A",      // deep warm red for severe / flare
   redSoft: "#F4D7D2",  // red tint for backgrounds
+  moderate: "#D9A441", // amber/gold for moderate severity
+  flareBand: "#FBE9B8",// soft butter band behind confirmed flare episodes
 };
+
+// Interpolate the pain-score chip from soft yellow (0) → deep red (10).
+function painChipColors(pain: number): { bg: string; fg: string } {
+  const t = Math.max(0, Math.min(10, pain)) / 10;
+  // yellow #F5C542 → red #B8443A
+  const from = { r: 0xf5, g: 0xc5, b: 0x42 };
+  const to = { r: 0xb8, g: 0x44, b: 0x3a };
+  const r = Math.round(from.r + (to.r - from.r) * t);
+  const g = Math.round(from.g + (to.g - from.g) * t);
+  const b = Math.round(from.b + (to.b - from.b) * t);
+  const bg = `rgb(${r}, ${g}, ${b})`;
+  // Switch to white text once the chip gets dark enough for contrast.
+  const fg = t > 0.5 ? "#FFFFFF" : "#141210";
+  return { bg, fg };
+}
+
+// Map an average pain value (0–10) to the same severity buckets shown in
+// the weekly log legend (Mild / Moderate / Severe).
+function painSeverityColor(pain: number): string {
+  if (pain <= 0) return "#CFC7BA"; // unlogged / no pain
+  if (pain < 4) return C.green;
+  if (pain < 7) return C.moderate;
+  return C.red;
+}
 
 // ---------------- Data model ----------------
 
