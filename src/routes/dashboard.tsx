@@ -725,10 +725,10 @@ function PainTooltip({ value, pct, visible }: { value: number; pct: number; visi
         <div
           className="absolute"
           style={{
-            left: `${pct}%`,
+            left: `clamp(100px, ${pct}%, calc(100% - 100px))`,
             bottom: 12,
-            transform: `translateX(${-pct}%)`,
-            maxWidth: 240,
+            transform: "translateX(-50%)",
+            maxWidth: 200,
             width: "max-content",
             opacity: visible ? 0.92 : 0,
             transition: "opacity 180ms ease",
