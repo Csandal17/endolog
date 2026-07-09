@@ -61,7 +61,7 @@ This is the heart of the project:
 
 ## Live demo
 
-🔗 [EndoHer on Lovable](https://endoher.lovable.app)
+🔗 https://endoher.dev
 
 ## Team
 
