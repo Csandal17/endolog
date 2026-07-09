@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CheckInProvider, useCheckIn } from "@/lib/check-in-store";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { useState } from "react";
 
 export const Route = createFileRoute("/check-in")({
@@ -57,26 +58,63 @@ function WizardShell() {
         />
       </div>
 
-      <div className="min-h-[320px] rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        Step {step} content coming soon.
+      {step === 1 ? (
+        <StepPain onContinue={() => setStep(2)} />
+      ) : (
+        <>
+          <div className="min-h-[320px] rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            Step {step} content coming soon.
+          </div>
+          <div className="mt-6 flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setStep((s) => Math.max(1, s - 1))}>
+              Back
+            </Button>
+            <Button
+              onClick={() => setStep((s) => Math.min(TOTAL_STEPS, s + 1))}
+              disabled={step === TOTAL_STEPS}
+            >
+              Continue
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
+function StepPain({ onContinue }: { onContinue: () => void }) {
+  const { dayRecord, setDayRecord } = useCheckIn();
+  return (
+    <div>
+      <h2 className="font-serif text-2xl text-foreground">Pain during the day</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Your overall pain experience across today — not just this moment.
+      </p>
+
+      <div className="mt-8 flex items-center gap-6">
+        <div className="flex-1">
+          <Slider
+            value={[dayRecord.pain]}
+            min={0}
+            max={10}
+            step={1}
+            onValueChange={([v]) => setDayRecord((prev) => ({ ...prev, pain: v }))}
+          />
+          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            <span>No pain</span>
+            <span>Worst imaginable</span>
+          </div>
+        </div>
+        <div className="w-20 text-right">
+          <span className="font-serif text-5xl text-foreground">{dayRecord.pain}</span>
+          <span className="ml-1 text-sm text-muted-foreground">/10</span>
+        </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <Button
-          variant="ghost"
-          onClick={() => setStep((s) => Math.max(1, s - 1))}
-          disabled={step === 1}
-        >
-          Back
-        </Button>
-        <Button
-          onClick={() => setStep((s) => Math.min(TOTAL_STEPS, s + 1))}
-          disabled={step === TOTAL_STEPS}
-        >
-          Continue
-        </Button>
+      <div className="mt-10 flex justify-end">
+        <Button onClick={onContinue}>Continue</Button>
       </div>
-    </Card>
+    </div>
   );
 }
 
