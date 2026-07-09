@@ -1,2067 +1,1649 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Download,
   FileText,
-  Loader2,
-  Sparkles,
-  Stethoscope,
-  UserRound,
-  AlertCircle,
-  Clock,
+  Flame,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { jsPDF } from "jspdf";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import * as api from "@/services/api";
-import type { Report as ApiReport, StructuredReport } from "@/services/api";
+import type { Report as ApiReport } from "@/services/api";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Log a symptom · Maai" },
-      { name: "description", content: "Log what you've been experiencing in your own words. Maai maps it to clinical terms so you have a clear record for every appointment." },
+      { title: "Daily log · Maai" },
+      { name: "description", content: "A calm daily check-in for endometriosis. Log today's pain, symptoms, and impact — see your patterns build over time." },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: Dashboard,
 });
 
-type Stage = "intake" | "normalising" | "generating" | "complete" | "error";
+// ---------------- Palette (inline via style so we don't disturb design tokens) ----------------
 
-type ReportSection = { title: string; content: string };
-type JobStatus = {
-  status: Stage;
-  stage_label?: string;
-  report?: { patient?: Record<string, string>; sections: ReportSection[] };
-  pdf_url?: string;
-  error?: string;
-  terms?: string[];
-  report_id?: string;
+const C = {
+  bg: "#F5F3F7",
+  card: "#FFFFFF",
+  text: "#2B2333",
+  muted: "#6E6579",
+  border: "#E4DFEA",
+  accent: "#D99A1B",
+  deep: "#B37D0E",
+  light: "#FDF3E3",
+  pink: "#F7DCEB",
+  green: "#DDE8C8",
+  blue: "#DDEAF7",
 };
 
-type IntakeForm = {
-  patient_name: string;
-  dob: string;
-  sex: string;
-  clinician: string;
-  notes: string;
-  pain_score: number;
-  pain_recorded_at: string; // datetime-local value: YYYY-MM-DDTHH:mm
-  socrates: SocratesAnswers;
-};
+// ---------------- Data model ----------------
 
-type SocratesAnswers = {
-  site: string[];
-  site_other: string;
-  onset: string;
-  cycle_link: string;
-  character: string[];
-  associated: string[];
-  radiation: string[];
-  duration: string;
-  pattern: string;
-  worse: string[];
-  better: string[];
-  nsaid_relief: string;
-};
+const PAIN_SITES = [
+  { key: "Pelvis", options: ["Cramping", "Stabbing", "Burning", "Dull ache"] },
+  { key: "Lower back", options: ["Cramping", "Dull ache", "Radiating to legs"] },
+  { key: "Bowel", options: ["Pain with bowel movements", "Diarrhoea", "Constipation"] },
+  { key: "Bladder", options: ["Pain when urinating", "Urgency", "Frequency"] },
+  { key: "During or after sex", options: ["Deep pain", "Ache afterwards"] },
+] as const;
 
-const emptySocrates: SocratesAnswers = {
-  site: [],
-  site_other: "",
-  onset: "",
-  cycle_link: "",
-  character: [],
-  associated: [],
-  radiation: [],
-  duration: "",
-  pattern: "",
-  worse: [],
-  better: [],
-  nsaid_relief: "",
-};
+const WHOLE_BODY = ["Bloating", "Nausea", "Fatigue", "Dizziness", "Bleeding"] as const;
 
-const emptyForm: IntakeForm = {
-  patient_name: "",
-  dob: "",
-  sex: "",
-  clinician: "",
-  notes: "",
-  pain_score: 0,
-  pain_recorded_at: "",
-  socrates: { ...emptySocrates, site: [], character: [], associated: [], radiation: [], worse: [], better: [] },
-};
+const IMPACT_OPTIONS = [
+  { label: "No", value: 0 as const },
+  { label: "Some things", value: 15 as const },
+  { label: "Most things", value: 25 as const },
+];
 
-type LogEntry = {
+const MED_EFFECT = ["Helped", "Partly", "No effect"] as const;
+
+type MedEffect = (typeof MED_EFFECT)[number] | null;
+type Impact = 0 | 15 | 25;
+
+type DailyLog = {
   id: string;
-  submittedAt: string; // ISO
-  patientName: string;
-  notesExcerpt: string;
-  terms: string[];
-};
-
-const ENTRIES_KEY = "maai:entries:v1";
-
-function nowLocalDatetime(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function formatPainWhen(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function painColor(score: number): string {
-  // 0 → green (140°), 10 → red (5°)
-  const hue = Math.round(140 - (score / 10) * 135);
-  return `hsl(${hue} 65% 45%)`;
-}
-
-// ---------- Reassurance banner data ----------
-
-interface BannerContent {
-  stat: string;
-  message: string;
-}
-
-type BannerData = { key: string; stat: string; message: string } | null;
-
-function getPainBanner(score: number): BannerContent {
-  if (score === 0) {
-    return {
-      stat: "80% of women experience some form of pelvic discomfort in their lifetime.",
-      message: "Taking a moment to check in with your body is a gentle act of self-care. Whatever you feel today is valid.",
-    };
-  }
-  if (score <= 3) {
-    return {
-      stat: "Around 1 in 2 women experience mild to moderate pelvic pain during their cycle.",
-      message: "Even mild signals from your body deserve attention. You're doing something kind by noticing and naming what you feel.",
-    };
-  }
-  if (score <= 6) {
-    return {
-      stat: "Chronic pelvic pain affects roughly 1 in 6 women — it is one of the most common reasons women seek care.",
-      message: "Moderate pain can be exhausting, and it's okay to acknowledge that. Tracking it helps you advocate for yourself with confidence.",
-    };
-  }
-  if (score <= 9) {
-    return {
-      stat: "Severe period pain is experienced by up to 1 in 10 women — many say it took years to feel truly heard.",
-      message: "Severe pain is not something you should have to endure in silence. Your experience is real, and you deserve thorough care and answers.",
-    };
-  }
-  return {
-    stat: "About 1 in 10 women live with pain so intense it disrupts daily life — yet it is still under-recognised in medicine.",
-    message: "If you are in this much pain, please reach out to a clinician as soon as you can. You are not being dramatic. You are not alone.",
+  date: string; // YYYY-MM-DD
+  loggedAt: string; // ISO
+  pain: number; // 0-10
+  siteDescriptors: Record<string, string[]>;
+  wholeBody: string[];
+  bleedingUnexpected: boolean | null;
+  otherSymptoms: string;
+  impact: Impact;
+  impactChosen: boolean;
+  medicationName: string;
+  medicationEffect: MedEffect;
+  detail: {
+    worse: string;
+    better: string;
+    timing: string;
+    pattern: string;
+    cycleLink: string;
   };
-}
-
-const CHECKBOX_BANNERS: Record<string, BannerContent> = {
-  Pelvis: {
-    stat: "Pelvic pain is one of the most common reasons women visit a GP — it's incredibly common.",
-    message: "Naming where it hurts is a powerful first step. You're building a clear story to share with your clinician.",
-  },
-  "Lower back": {
-    stat: "Lower back pain is reported by up to 70% of women with pelvic conditions — the two are often linked.",
-    message: "It can be so easy to dismiss back pain as 'just stress.' You're allowed to connect it to the bigger picture.",
-  },
-  "Lower abdomen (left)": {
-    stat: "Left-sided abdominal pain has a wide range of causes, many of them treatable.",
-    message: "Noticing the exact side helps your clinician build a much clearer picture. You're doing great.",
-  },
-  "Lower abdomen (right)": {
-    stat: "Right-sided pain is one of the most documented locations in women's health assessments.",
-    message: "Being precise about location gives your care team valuable information. Every detail you share matters.",
-  },
-  Legs: {
-    stat: "Leg pain can be a referred symptom from pelvic conditions — it's more common than many realise.",
-    message: "Pain that travels is real pain. You're not imagining the connection — and now it's on the record.",
-  },
-  "Rectum/back passage": {
-    stat: "Bowel-related pelvic pain is experienced by many women, though it's rarely talked about openly.",
-    message: "This can feel awkward to mention, but it's important clinical information. You're being brave and thorough.",
-  },
-  "Sudden — came on quickly": {
-    stat: "Sudden-onset pain accounts for a significant portion of urgent women's health presentations.",
-    message: "A quick change in how you feel can feel alarming. Trusting that instinct and logging it is exactly the right thing to do.",
-  },
-  "Gradual — built up slowly": {
-    stat: "Gradual symptoms are how many long-term conditions first present — slow change is still meaningful change.",
-    message: "It can be hard to notice something that creeps up. The fact that you're reflecting on it now shows real self-awareness.",
-  },
-  "In the days before my period": {
-    stat: "Premenstrual symptoms affect up to 90% of women at some point — you are far from alone in this.",
-    message: "The days before a period can feel heavy in so many ways. Noticing the pattern is a real gift to your future self.",
-  },
-  "During my period": {
-    stat: "Period pain is the leading cause of missed school and work for women worldwide.",
-    message: "Pain during your period is common, but that doesn't mean you have to accept it without support. You deserve relief.",
-  },
-  "In the days after my period": {
-    stat: "Post-menstrual symptoms are reported by many women and are a recognised part of the cycle for some.",
-    message: "Noticing what happens after bleeding stops is just as important. You're seeing the whole picture, not just the obvious part.",
-  },
-  "Around ovulation (mid-cycle)": {
-    stat: "Ovulation pain, or 'mittelschmerz', is experienced by about 1 in 5 women.",
-    message: "Mid-cycle sensations are easy to overlook. Logging them now gives your clinician a fuller understanding of your cycle.",
-  },
-  "No link to my cycle": {
-    stat: "Pain that isn't cycle-linked is equally important to investigate — it deserves the same careful attention.",
-    message: "Ruling out a cycle link is just as valuable as finding one. You're helping your clinician focus on the right questions.",
-  },
-  "I'm not sure": {
-    stat: "Uncertainty is completely normal — most women say they haven't tracked symptoms closely before.",
-    message: "You don't need to have all the answers right now. Starting to track is already a huge step forward.",
-  },
-  Cramping: {
-    stat: "Cramping is the most commonly described period pain symptom across all age groups.",
-    message: "That gripping, wave-like sensation is real and physical. Describing it as cramping gives your clinician a clear signal.",
-  },
-  Sharp: {
-    stat: "Sharp, stabbing pain is one of the most distressing symptom types women report — and it's always worth investigating.",
-    message: "Sharp pain can feel scary. Naming it precisely helps your care team understand the urgency and nature of what you're feeling.",
-  },
-  Stabbing: {
-    stat: "Stabbing pain is a well-documented descriptor in endometriosis and adenomyosis assessments.",
-    message: "That sudden, piercing quality matters. You're not exaggerating — you're describing something very real.",
-  },
-  Burning: {
-    stat: "Burning sensations are commonly associated with nerve-related or inflammatory pelvic conditions.",
-    message: "Burning is a specific and important symptom. Trust the word that fits what you feel.",
-  },
-  "Dull ache": {
-    stat: "A persistent dull ache is how many women first notice something isn't quite right — it's often the earliest sign.",
-    message: "Dull aches are easy to push through, but they deserve attention too. You are allowed to take this seriously.",
-  },
-  Throbbing: {
-    stat: "Throbbing pain is frequently described in vascular and inflammatory pelvic conditions.",
-    message: "That pulsing, rhythmic quality is a meaningful clinical detail. You're doing so well at describing your experience.",
-  },
-  Nausea: {
-    stat: "Nausea alongside pelvic pain is reported by about 1 in 3 women with endometriosis.",
-    message: "Feeling sick on top of everything else is really hard. It's not 'just stress' — it's a real symptom that belongs in your record.",
-  },
-  Bloating: {
-    stat: "Bloating is one of the top three symptoms women with pelvic conditions report — it's extremely common.",
-    message: "That uncomfortable, swollen feeling is more than just inconvenient. It matters, and you're right to include it.",
-  },
-  Fatigue: {
-    stat: "Fatigue is reported by up to 80% of women living with chronic pelvic pain — it is a real, physical symptom.",
-    message: "Being tired all the time is not a character flaw. It's a signal from your body that deserves just as much care as the pain itself.",
-  },
-  Dizziness: {
-    stat: "Dizziness with pelvic pain can be linked to blood loss, hormonal shifts, or pain response — it's always worth noting.",
-    message: "That lightheaded, unsteady feeling is not something to brush off. You're being smart to log it alongside everything else.",
-  },
-  "Pain when passing a bowel motion": {
-    stat: "Pain during bowel movements is a recognised symptom in endometriosis and other pelvic conditions.",
-    message: "This can feel embarrassing to mention, but it's one of the most helpful details you can share. You are being so thorough.",
-  },
-  "Pain when passing urine": {
-    stat: "Urinary pain is common in many pelvic and bladder conditions — it's a symptom clinicians ask about for good reason.",
-    message: "Burning or pain when peeing is a clear signal. You're not overthinking it — you're paying attention to what your body needs.",
-  },
-  "Heavy bleeding": {
-    stat: "Heavy menstrual bleeding affects up to 1 in 3 women and is one of the most under-reported symptoms.",
-    message: "If your bleeding feels like too much, trust that instinct. 'Heavy' is personal, and your experience is the only definition that matters.",
-  },
-  "Down the legs": {
-    stat: "Leg radiation is a documented feature of several pelvic conditions, including endometriosis.",
-    message: "Pain that travels down your legs is real and valid. You are not making this up — it's a recognised clinical pattern.",
-  },
-  "Towards the rectum/back passage": {
-    stat: "Rectal pain radiation is a key symptom in deep infiltrating endometriosis assessments.",
-    message: "This is one of the most specific symptoms you can report. Being open about it will help your clinician enormously.",
-  },
-  "Towards the vagina": {
-    stat: "Vaginal pain radiation is commonly described in pelvic congestion and inflammatory conditions.",
-    message: "It takes courage to name this. Your openness is helping build a complete and honest clinical picture.",
-  },
-  "Doesn't spread anywhere else": {
-    stat: "Localised pain is just as medically significant as pain that spreads — location itself tells a story.",
-    message: "Knowing that the pain stays in one place is valuable information. Every detail you notice is worth recording.",
-  },
-  Minutes: {
-    stat: "Brief episodes of pelvic pain are common and can still be part of a meaningful pattern.",
-    message: "Even pain that comes and goes quickly is worth noting. Patterns build over time, and every entry counts.",
-  },
-  Hours: {
-    stat: "Pain lasting hours is one of the most commonly logged durations in women's symptom diaries.",
-    message: "Hours of discomfort is a significant chunk of your day. You deserve care that takes that time seriously.",
-  },
-  Days: {
-    stat: "Multi-day pelvic pain is a hallmark symptom of several common gynaecological conditions.",
-    message: "When pain stretches across days, it affects everything. Acknowledging that impact is a brave and necessary step.",
-  },
-  "Constant, doesn't go away": {
-    stat: "Chronic daily pelvic pain affects millions of women — constant pain is never something to ignore.",
-    message: "Living with unrelenting pain is exhausting beyond words. Please keep advocating for yourself — you deserve answers and relief.",
-  },
-  "It's constant": {
-    stat: "Constant pain is one of the strongest indicators that a symptom deserves thorough investigation.",
-    message: "A pain that never lets up wears on more than just your body. You are allowed to want — and demand — answers.",
-  },
-  "It comes and goes": {
-    stat: "Intermittent pain is how many conditions first present — the pattern is just as important as the intensity.",
-    message: "Coming-and-going pain can be frustratingly easy to dismiss. Logging it gives you proof, and that proof is powerful.",
-  },
-  "Moving around": {
-    stat: "Pain worsened by movement is a key diagnostic clue and is documented across many pelvic conditions.",
-    message: "Noticing what makes it worse is real detective work. You're building a detailed, useful record.",
-  },
-  Sex: {
-    stat: "Pain during sex is reported by up to 1 in 10 women — it is far more common than conversations suggest.",
-    message: "This can feel deeply personal to share, but it's one of the most important symptoms to bring to your clinician. You are not alone in this.",
-  },
-  "Bowel movements": {
-    stat: "Bowel-related pain is a well-documented symptom in pelvic assessment — it's a standard, important question.",
-    message: "There's no shame in this. Clinicians ask about it because it matters. You're answering with honesty and strength.",
-  },
-  "Passing urine": {
-    stat: "Urinary pain is one of the most common accompaniments to pelvic conditions in women.",
-    message: "Pain when peeing is your body sending a clear signal. Trust it, and know that help is available.",
-  },
-  Exercise: {
-    stat: "Exercise-triggered pelvic pain is increasingly recognised in sports medicine and women's health.",
-    message: "Wanting to move your body but being held back by pain is frustrating. You're not weak — your body is asking for support.",
-  },
-  Rest: {
-    stat: "Finding relief in rest is one of the most common self-management strategies women report.",
-    message: "Rest is not laziness — it's a valid and important part of managing how you feel. Give yourself permission to slow down.",
-  },
-  "Heat (e.g. hot water bottle)": {
-    stat: "Heat therapy is one of the oldest and most widely used comfort measures for pelvic pain.",
-    message: "That gentle warmth is more than a comfort — it's a recognised, effective way to soothe cramping and tension. You know your body.",
-  },
-  "Painkillers (NSAIDs, e.g. ibuprofen)": {
-    stat: "NSAIDs are the most commonly recommended first-line treatment for period pain worldwide.",
-    message: "Reaching for pain relief is not weakness — it's self-care. You're allowed to seek comfort and support.",
-  },
-  "Hormonal contraception": {
-    stat: "Hormonal treatments help many women manage cyclical symptoms — they are a well-established option.",
-    message: "Finding what works for your body is a journey, not a failure. Every option you explore is a step toward understanding yourself better.",
-  },
-  "Haven't tried NSAIDs": {
-    stat: "Many women haven't tried NSAIDs yet — it's completely okay to be at the beginning of your management journey.",
-    message: "You don't need to have tried everything already. Starting to track and explore options is exactly where many women begin.",
-  },
-  "No relief at all": {
-    stat: "When standard pain relief doesn't work, it's a strong signal that your symptoms deserve deeper investigation.",
-    message: "If ibuprofen doesn't touch the pain, that's important information — not a failure on your part. Your clinician needs to know this.",
-  },
-  "Some relief, but pain continues": {
-    stat: "Partial relief is one of the most common experiences — it tells your care team that something is working, but not enough.",
-    message: "Some help is still help, but you deserve more than 'a bit better.' Keep pushing for answers that fully address what you feel.",
-  },
-  "Fully relieved": {
-    stat: "Complete relief with NSAIDs is a useful diagnostic clue — it helps narrow down the type of pain you're experiencing.",
-    message: "Full relief is wonderful news, and it's also medically useful. Your care team will value knowing this works for you.",
-  },
+  burden: number;
 };
 
-function ReassuranceBanner({
-  stat,
-  message,
-  onDismiss,
-}: {
-  stat: string;
-  message: string;
-  onDismiss?: () => void;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      className="rounded-2xl border border-powder/60 bg-powder/20 p-5"
-    >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-powder/60">
-          <Sparkles className="h-4 w-4 text-charcoal" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-charcoal">{message}</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-warm-grey">{stat}</p>
-        </div>
-        {onDismiss && (
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-            aria-label="Dismiss"
-          >
-            Dismiss
-          </button>
-        )}
-      </div>
-    </motion.div>
-  );
-}
+const LOGS_KEY = "maai:daily-logs:v1";
 
-function readEntries(): LogEntry[] {
+function readLogs(): DailyLog[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(ENTRIES_KEY);
+    const raw = window.localStorage.getItem(LOGS_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as LogEntry[];
+    const parsed = JSON.parse(raw) as DailyLog[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
-
-function writeEntries(next: LogEntry[]) {
+function writeLogs(next: DailyLog[]) {
   try {
-    window.localStorage.setItem(ENTRIES_KEY, JSON.stringify(next));
+    window.localStorage.setItem(LOGS_KEY, JSON.stringify(next));
   } catch {
-    /* ignore quota / privacy mode */
+    /* ignore */
   }
 }
 
-function Dashboard() {
-  const [form, setForm] = useState<IntakeForm>(emptyForm);
-  const [reportId, setReportId] = useState<string | null>(null);
-  const [job, setJob] = useState<JobStatus | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const mockTimerRef = useRef<number | null>(null);
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const savedForJobRef = useRef<string | null>(null);
-  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+// ---------------- Scoring ----------------
 
-  // Load persisted entries after mount (avoid SSR/hydration mismatch)
-  useEffect(() => {
-    setEntries(readEntries());
-    // Seed pain timestamp with "now" once, client-side, to avoid SSR mismatch.
-    setForm((f) => (f.pain_recorded_at ? f : { ...f, pain_recorded_at: nowLocalDatetime() }));
-  }, []);
+type ScoreBreakdown = {
+  pain: number;
+  impact: number;
+  symptoms: number;
+  bleeding: number;
+  total: number;
+  severity: "No symptoms" | "Mild" | "Moderate" | "Severe";
+  symptomCount: number;
+};
 
-  // When a job completes, persist an entry once.
-  useEffect(() => {
-    if (!job || job.status !== "complete") return;
-    const key = reportId ?? "job";
-    if (savedForJobRef.current === key) return;
-    savedForJobRef.current = key;
-    const terms = deriveTerms(job, form);
-    const entry: LogEntry = {
-      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      submittedAt: new Date().toISOString(),
-      patientName: form.patient_name || "You",
-      notesExcerpt: (form.notes || "").trim().slice(0, 220),
-      terms,
+function calcScore(input: {
+  pain: number;
+  siteDescriptors: Record<string, string[]>;
+  wholeBody: string[];
+  bleedingUnexpected: boolean | null;
+  impact: Impact;
+}): ScoreBreakdown {
+  const painPts = input.pain * 5;
+  const impactPts = input.pain >= 4 ? input.impact : 0;
+
+  // Symptom points: whole body + bowel/bladder/sex site descriptors count.
+  // Pain-character descriptors (cramping, stabbing, burning, dull ache, radiating to legs) do NOT count.
+  const painCharacter = new Set([
+    "Cramping",
+    "Stabbing",
+    "Burning",
+    "Dull ache",
+    "Radiating to legs",
+  ]);
+  let symptomCount = input.wholeBody.length;
+  for (const [, descs] of Object.entries(input.siteDescriptors)) {
+    for (const d of descs) {
+      if (!painCharacter.has(d)) symptomCount += 1;
+    }
+  }
+  const symptomPts = Math.min(15, symptomCount * 3);
+  const bleedingPts = input.bleedingUnexpected ? 10 : 0;
+
+  const total = Math.min(100, painPts + impactPts + symptomPts + bleedingPts);
+  const severity: ScoreBreakdown["severity"] =
+    total === 0 ? "No symptoms" : total < 25 ? "Mild" : total < 50 ? "Moderate" : "Severe";
+
+  return {
+    pain: painPts,
+    impact: impactPts,
+    symptoms: symptomPts,
+    bleeding: bleedingPts,
+    total,
+    severity,
+    symptomCount,
+  };
+}
+
+function severityColor(s: ScoreBreakdown["severity"]): string {
+  if (s === "No symptoms") return C.green;
+  if (s === "Mild") return C.blue;
+  if (s === "Moderate") return C.light;
+  return C.pink;
+}
+
+// ---------------- Flare logic ----------------
+
+type FlareState =
+  | { kind: "locked"; message: string }
+  | { kind: "below"; threshold: number; message: string }
+  | { kind: "elevated"; threshold: number; message: string }
+  | { kind: "confirms"; threshold: number; message: string };
+
+function median(nums: number[]): number {
+  const s = [...nums].sort((a, b) => a - b);
+  const n = s.length;
+  if (n === 0) return 0;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+function computeBaseline(logs: DailyLog[], onDate: string): { baseline: number | null; sample: number } {
+  const cutoff = new Date(onDate);
+  const start = new Date(cutoff);
+  start.setDate(start.getDate() - 30);
+  const within = logs.filter((l) => {
+    const d = new Date(l.date);
+    return d < cutoff && d >= start;
+  });
+  if (within.length < 14) return { baseline: null, sample: within.length };
+  return { baseline: median(within.map((l) => l.burden)), sample: within.length };
+}
+
+function flareThreshold(baseline: number | null): number | null {
+  if (baseline == null) return null;
+  return Math.max(baseline + 15, 50);
+}
+
+function evaluateFlare(logs: DailyLog[], todayScore: number, today: string): FlareState {
+  const { baseline, sample } = computeBaseline(logs, today);
+  if (baseline == null) {
+    return {
+      kind: "locked",
+      message: `Your personal baseline unlocks after 14 logged days (${sample}/14).`,
     };
-    setEntries((prev) => {
-      const next = [entry, ...prev].slice(0, 100);
-      writeEntries(next);
-      return next;
-    });
-  }, [job, reportId, form]);
-
-  function deleteEntry(id: string) {
-    setEntries((prev) => {
-      const next = prev.filter((e) => e.id !== id);
-      writeEntries(next);
-      return next;
-    });
   }
-
-  function clearEntries() {
-    setEntries([]);
-    writeEntries([]);
+  const threshold = flareThreshold(baseline)!;
+  const elevated = todayScore > threshold;
+  if (!elevated) {
+    return { kind: "below", threshold, message: "Below your flare threshold." };
   }
+  // Was yesterday or day-before elevated (allowing 1-day bridge)?
+  const priorElevated = logs.some((l) => {
+    if (l.burden <= threshold) return false;
+    const diff = daysBetween(l.date, today);
+    return diff >= 1 && diff <= 2;
+  });
+  if (priorElevated) {
+    return {
+      kind: "confirms",
+      threshold,
+      message: "Logging this confirms a flare episode.",
+    };
+  }
+  return {
+    kind: "elevated",
+    threshold,
+    message:
+      "Above your flare threshold. If tomorrow is also elevated, a flare episode will be confirmed.",
+  };
+}
 
-  useEffect(() => () => {
-    if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
+function daysBetween(a: string, b: string): number {
+  const da = new Date(a).getTime();
+  const db = new Date(b).getTime();
+  return Math.round(Math.abs(db - da) / 86400000);
+}
+
+// Given all logs, determine which log ids belong to a confirmed flare episode.
+function flareEpisodeIds(logs: DailyLog[]): { ids: Set<string>; episodes: string[][] } {
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  const ids = new Set<string>();
+  const episodes: string[][] = [];
+  let current: DailyLog[] = [];
+  const flush = () => {
+    if (current.length >= 2) {
+      episodes.push(current.map((c) => c.id));
+      current.forEach((c) => ids.add(c.id));
+    }
+    current = [];
+  };
+  for (const log of sorted) {
+    const { baseline } = computeBaseline(sorted, log.date);
+    const thr = flareThreshold(baseline);
+    if (thr == null || log.burden <= thr) {
+      // Allow 1-day gap: check if next log within 2 days would extend
+      const last = current[current.length - 1];
+      if (last && daysBetween(last.date, log.date) <= 2) {
+        continue;
+      }
+      flush();
+      continue;
+    }
+    if (current.length === 0) {
+      current.push(log);
+    } else {
+      const last = current[current.length - 1];
+      if (daysBetween(last.date, log.date) <= 2) current.push(log);
+      else {
+        flush();
+        current.push(log);
+      }
+    }
+  }
+  flush();
+  return { ids, episodes };
+}
+
+// ---------------- Dashboard root ----------------
+
+function todayStr(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function emptyLog(): DailyLog {
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    date: todayStr(),
+    loggedAt: new Date().toISOString(),
+    pain: 0,
+    siteDescriptors: {},
+    wholeBody: [],
+    bleedingUnexpected: null,
+    otherSymptoms: "",
+    impact: 0,
+    impactChosen: false,
+    medicationName: "",
+    medicationEffect: null,
+    detail: { worse: "", better: "", timing: "", pattern: "", cycleLink: "" },
+    burden: 0,
+  };
+}
+
+function Dashboard() {
+  const [logs, setLogs] = useState<DailyLog[]>([]);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+
+  useEffect(() => {
+    setLogs(readLogs());
   }, []);
 
-  const update = (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const setSocrates = (patch: Partial<SocratesAnswers>) =>
-    setForm((f) => ({ ...f, socrates: { ...f.socrates, ...patch } }));
-
-  const [banner, setBanner] = useState<BannerData>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.patient_name.trim() || !form.notes.trim()) {
-      setError("Name and clinical notes are required.");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    setReportId(null);
-    // Kick off a client-side visual walk through the three agents while the
-    // API request is in flight — the mock backend replies in < 2s but we
-    // want the user to see each stage light up.
-    animateStages(setJob, mockTimerRef);
-
-    try {
-      const painLine = `Pain (NRS 0–10): ${form.pain_score}/10${
-        form.pain_recorded_at ? ` — recorded ${formatPainWhen(form.pain_recorded_at)}` : ""
-      }`;
-      const socratesText = formatSocrates(form.socrates);
-      const res = await api.processPatientIntake({
-        patient_name: form.patient_name.trim(),
-        dob: form.dob || undefined,
-        sex: form.sex || undefined,
-        clinician: form.clinician || undefined,
-        input_text: `${painLine}${socratesText ? `\n\n${socratesText}` : ""}\n\n${form.notes.trim()}`,
-      });
-      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
-      // Fetch the persisted report so the preview renders the exact bytes
-      // that the backend stored (parity with the future FastAPI response).
-      const stored = await api.getReport(res.report_id);
-      const structured = stored.structured_data;
-      if (!structured) throw new Error("Backend did not return structured data");
-      setReportId(res.report_id);
-      setJob({
-        status: "complete",
-        stage_label: "Pipeline complete",
-        report: toLegacyReport(structured),
-        pdf_url: stored.pdf_url ?? `/api/reports/${res.report_id}/pdf`,
-        terms: structured.clinical_terms,
-        report_id: res.report_id,
-      });
-      setHistoryRefreshKey((k) => k + 1);
-    } catch (err) {
-      console.error(err);
-      if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
-      const message = err instanceof Error ? err.message : "Could not reach the intake service.";
-      setError(message);
-      setJob({ status: "error", error: message });
-    } finally {
-      setSubmitting(false);
-    }
+  function saveLog(entry: DailyLog) {
+    setLogs((prev) => {
+      const next = [entry, ...prev].slice(0, 365);
+      writeLogs(next);
+      return next;
+    });
   }
-
-  function reset() {
-    if (mockTimerRef.current) window.clearTimeout(mockTimerRef.current);
-    setJob(null);
-    setReportId(null);
-    setError(null);
+  function deleteLog(id: string) {
+    setLogs((prev) => {
+      const next = prev.filter((l) => l.id !== id);
+      writeLogs(next);
+      return next;
+    });
   }
-
-  const stage: Stage = job?.status ?? "intake";
-  const showForm = !job || job.status === "error";
+  function clearLogs() {
+    setLogs([]);
+    writeLogs([]);
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div style={{ background: C.bg, color: C.text }} className="min-h-screen font-[Karla,system-ui,sans-serif]">
       <TopBar />
-      <main className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
-        <Header />
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+        <header className="mb-6 sm:mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: C.muted }}>
+            Daily log
+          </p>
+          <h1
+            className="mt-2 text-3xl leading-tight sm:text-4xl"
+            style={{ fontFamily: "Fraunces, DM Serif Display, Georgia, serif", color: C.text }}
+          >
+            How has today been?
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: C.muted }}>
+            A short check-in. Answer what you can, skip what you can't — it all builds your pattern.
+          </p>
+        </header>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_1fr]">
-          <section>
-            <AnimatePresence mode="wait">
-              {showForm ? (
-                <motion.div
-                  key="form"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                >
-                  <IntakeCard
-                    form={form}
-                    update={update}
-                    setSocrates={setSocrates}
-                    onPainScore={(n) => setForm((f) => ({ ...f, pain_score: n }))}
-                    onPainDateTime={(v) => setForm((f) => ({ ...f, pain_recorded_at: v }))}
-                    onPainDateTimeNow={() =>
-                      setForm((f) => ({ ...f, pain_recorded_at: nowLocalDatetime() }))
-                    }
-                    submit={submit}
-                    submitting={submitting}
-                    error={error ?? job?.error ?? null}
-                    onReset={() =>
-                      setForm({
-                        ...emptyForm,
-                        pain_recorded_at: nowLocalDatetime(),
-                        socrates: { ...emptySocrates },
-                      })
-                    }
-                    banner={banner}
-                    onShowBanner={(b) => setBanner({ key: `${Date.now()}`, ...b })}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="progress"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <ProgressCard stage={stage} label={job?.stage_label} onReset={reset} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </section>
-
-          <section>
-            <ReportPreview job={job} form={form} reportId={reportId} />
-          </section>
-        </div>
+        <DailyLogSection onSave={saveLog} onGeneratedReport={() => setHistoryRefresh((k) => k + 1)} logs={logs} />
 
         <section className="mt-10">
-          <TimelineCard entries={entries} onDelete={deleteEntry} onClear={clearEntries} />
+          <PatternOverTime logs={logs} onDelete={deleteLog} onClear={clearLogs} />
         </section>
 
         <section className="mt-10">
-          <ReportHistoryCard refreshKey={historyRefreshKey} />
+          <ReportPreviewCard logs={logs} onGenerated={() => setHistoryRefresh((k) => k + 1)} />
         </section>
-      </main>
 
-      <footer className="border-t border-border/40 bg-background">
-        <div className="mx-auto max-w-6xl px-6 py-8 text-center text-sm text-muted-foreground">
+        <section className="mt-10">
+          <ReportHistoryCard refreshKey={historyRefresh} />
+        </section>
+
+        <footer className="mt-12 pb-6 text-center text-xs" style={{ color: C.muted }}>
           <p>Maai does not diagnose. Always consult a clinician.</p>
           <p className="mt-1">© 2026 Maai. Made with care.</p>
-        </div>
-      </footer>
+        </footer>
+      </main>
     </div>
   );
 }
 
 function TopBar() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <header
+      className="sticky top-0 z-30 border-b backdrop-blur"
+      style={{ borderColor: C.border, background: `${C.bg}dd` }}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
-            <span className="font-serif text-base leading-none">M</span>
+          <div
+            className="grid h-9 w-9 place-items-center rounded-2xl text-sm"
+            style={{ background: C.accent, color: "#fff", fontFamily: "Fraunces, serif" }}
+          >
+            M
           </div>
-          <span className="font-serif text-xl tracking-tight">Maai</span>
-          <Badge className="ml-2 rounded-full bg-butter/40 text-charcoal hover:bg-butter/40">
-            Your log
-          </Badge>
+          <span style={{ fontFamily: "Fraunces, serif" }} className="text-lg tracking-tight">
+            Maai
+          </span>
         </Link>
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm"
+          style={{ color: C.muted }}
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to site
+          Home
         </Link>
       </div>
     </header>
   );
 }
 
-function Header() {
+// ---------------- Daily log 3-step wizard ----------------
+
+function DailyLogSection({
+  onSave,
+  onGeneratedReport: _onGeneratedReport,
+  logs,
+}: {
+  onSave: (log: DailyLog) => void;
+  onGeneratedReport: () => void;
+  logs: DailyLog[];
+}) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [log, setLog] = useState<DailyLog>(() => emptyLog());
+  const [confirmed, setConfirmed] = useState<DailyLog | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+
+  const score = useMemo(
+    () =>
+      calcScore({
+        pain: log.pain,
+        siteDescriptors: log.siteDescriptors,
+        wholeBody: log.wholeBody,
+        bleedingUnexpected: log.bleedingUnexpected,
+        impact: log.impactChosen ? log.impact : 0,
+      }),
+    [log],
+  );
+
+  const flare = useMemo(
+    () => evaluateFlare(logs, score.total, log.date),
+    [logs, score.total, log.date],
+  );
+
+  function update(patch: Partial<DailyLog>) {
+    setLog((prev) => ({ ...prev, ...patch }));
+  }
+  function toggleDescriptor(site: string, d: string) {
+    setLog((prev) => {
+      const current = prev.siteDescriptors[site] ?? [];
+      const next = current.includes(d) ? current.filter((x) => x !== d) : [...current, d];
+      return { ...prev, siteDescriptors: { ...prev.siteDescriptors, [site]: next } };
+    });
+  }
+  function toggleSite(site: string) {
+    setLog((prev) => {
+      const has = site in prev.siteDescriptors;
+      const next = { ...prev.siteDescriptors };
+      if (has) delete next[site];
+      else next[site] = [];
+      return { ...prev, siteDescriptors: next };
+    });
+  }
+  function toggleWhole(s: string) {
+    setLog((prev) => {
+      const has = prev.wholeBody.includes(s);
+      const nextArr = has ? prev.wholeBody.filter((x) => x !== s) : [...prev.wholeBody, s];
+      return {
+        ...prev,
+        wholeBody: nextArr,
+        bleedingUnexpected: s === "Bleeding" && has ? null : prev.bleedingUnexpected,
+      };
+    });
+  }
+
+  function submit() {
+    const final: DailyLog = { ...log, burden: score.total, loggedAt: new Date().toISOString() };
+    onSave(final);
+    setConfirmed(final);
+  }
+
+  function startOver() {
+    setConfirmed(null);
+    setLog(emptyLog());
+    setStep(1);
+    setShowDetail(false);
+  }
+
+  if (confirmed) {
+    return <ConfirmationCard log={confirmed} onBack={startOver} />;
+  }
+
   return (
-    <div className="max-w-3xl">
-      <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">
-        YOUR LOG
-      </p>
-      <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
-        Tell us how you've been.
-      </h1>
-      <p className="mt-3 text-muted-foreground">
-        Describe it in your own words, however feels natural. Maai turns it into a clear record
-        you can bring to your next appointment.
-      </p>
+    <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-5">
+        <SoftCard>
+          <StepHeader step={step} />
+          {step === 1 && (
+            <Step1
+              pain={log.pain}
+              onPain={(v) => update({ pain: v })}
+              onContinue={() => setStep(2)}
+            />
+          )}
+          {step === 2 && (
+            <Step2
+              log={log}
+              onToggleSite={toggleSite}
+              onToggleDescriptor={toggleDescriptor}
+              onToggleWhole={toggleWhole}
+              onBleeding={(v) => update({ bleedingUnexpected: v })}
+              onOther={(v) => update({ otherSymptoms: v })}
+              onBack={() => setStep(1)}
+              onContinue={() => setStep(3)}
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              log={log}
+              onImpact={(v) => update({ impact: v, impactChosen: true })}
+              onMedName={(v) => update({ medicationName: v })}
+              onMedEffect={(v) => update({ medicationEffect: v })}
+              onBack={() => setStep(2)}
+              onSubmit={submit}
+            />
+          )}
+        </SoftCard>
+
+        <SoftCard>
+          <button
+            type="button"
+            onClick={() => setShowDetail((s) => !s)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <div>
+              <div
+                className="text-base"
+                style={{ fontFamily: "Fraunces, serif", color: C.text }}
+              >
+                Add more detail for your report
+              </div>
+              <div className="mt-0.5 text-xs" style={{ color: C.muted }}>
+                Optional. Won't change your burden score.
+              </div>
+            </div>
+            {showDetail ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+          {showDetail && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <DetailField label="What made it worse?" value={log.detail.worse}
+                onChange={(v) => update({ detail: { ...log.detail, worse: v } })} />
+              <DetailField label="What made it better?" value={log.detail.better}
+                onChange={(v) => update({ detail: { ...log.detail, better: v } })} />
+              <DetailField label="Timing" value={log.detail.timing}
+                onChange={(v) => update({ detail: { ...log.detail, timing: v } })} />
+              <DetailField label="Pattern" value={log.detail.pattern}
+                onChange={(v) => update({ detail: { ...log.detail, pattern: v } })} />
+              <div className="sm:col-span-2">
+                <DetailField label="Cycle link" value={log.detail.cycleLink}
+                  onChange={(v) => update({ detail: { ...log.detail, cycleLink: v } })} />
+              </div>
+            </div>
+          )}
+        </SoftCard>
+      </div>
+
+      <BurdenPanel score={score} flare={flare} />
     </div>
   );
 }
 
-function IntakeCard({
-  form,
-  update,
-  setSocrates,
-  onPainScore,
-  onPainDateTime,
-  onPainDateTimeNow,
-  submit,
-  submitting,
-  error,
-  onReset,
-  banner,
-  onShowBanner,
-}: {
-  form: IntakeForm;
-  update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  setSocrates: (patch: Partial<SocratesAnswers>) => void;
-  onPainScore: (n: number) => void;
-  onPainDateTime: (v: string) => void;
-  onPainDateTimeNow: () => void;
-  submit: (e: React.FormEvent) => void;
-  submitting: boolean;
-  error: string | null;
-  onReset: () => void;
-  banner: BannerData;
-  onShowBanner: (b: BannerContent) => void;
-}) {
+function StepHeader({ step }: { step: 1 | 2 | 3 }) {
   return (
-    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-pink/30 text-charcoal">
-          <UserRound className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="font-serif text-2xl leading-none tracking-tight">My Pain Profile</h2>
-        </div>
+    <div className="mb-5">
+      <div className="flex items-center gap-2 text-xs" style={{ color: C.muted }}>
+        <span>Step {step} of 3</span>
       </div>
-
-      <form onSubmit={submit} className="mt-6 space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Name" required>
-            <Input
-              value={form.patient_name}
-              onChange={update("patient_name")}
-              placeholder="Jane Doe"
-              name="name"
-              autoComplete="name"
-            />
-          </Field>
-          <Field label="Date of birth">
-            <Input type="date" value={form.dob} onChange={update("dob")} autoComplete="bday" />
-          </Field>
-        </div>
-
-        <PainNrsField
-          score={form.pain_score}
-          recordedAt={form.pain_recorded_at}
-          onScore={onPainScore}
-          onDateTime={onPainDateTime}
-          onNow={onPainDateTimeNow}
-          onShowBanner={onShowBanner}
-        />
-
-        <AnimatePresence>
-          {banner?.stat && (
-            <ReassuranceBanner
-              key={banner.key}
-              stat={banner.stat}
-              message={banner.message}
-              onDismiss={() => onShowBanner({ stat: "", message: "" })}
-            />
-          )}
-        </AnimatePresence>
-
-        <SocratesFields
-          answers={form.socrates}
-          onChange={setSocrates}
-          onShowBanner={onShowBanner}
-        />
-
-        <Field
-          label="What have you been experiencing?"
-          required
-          hint="In your own words. Maai will map it to clinical terms."
-        >
-          <Textarea
-            value={form.notes}
-            onChange={update("notes")}
-            placeholder="e.g. sharp cramping on my left side for the last three days, worse at night, waking me up. Bloated most afternoons…"
-            rows={9}
-            className="resize-none"
+      <div className="mt-2 flex gap-1.5">
+        {[1, 2, 3].map((n) => (
+          <div
+            key={n}
+            className="h-1.5 flex-1 rounded-full transition-all"
+            style={{ background: n <= step ? C.accent : C.border }}
           />
-        </Field>
-
-        {error && (
-          <div className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onReset}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Clear form
-          </button>
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                Submitting…
-              </>
-            ) : (
-              <>
-                Generate report
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </form>
-    </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function Field({
-  label,
-  hint,
-  required,
-  children,
+// ---------------- Step 1: pain ----------------
+
+function Step1({
+  pain,
+  onPain,
+  onContinue,
 }: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: React.ReactNode;
+  pain: number;
+  onPain: (n: number) => void;
+  onContinue: () => void;
 }) {
   return (
     <div>
-      <Label className="text-xs font-medium uppercase tracking-wide text-warm-grey">
-        {label}
-        {required && <span className="ml-1 text-primary">*</span>}
-      </Label>
-      <div className="mt-2">{children}</div>
-      {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
+      <h2 className="text-2xl leading-snug" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        Pain during the day
+      </h2>
+      <p className="mt-2 text-sm" style={{ color: C.muted }}>
+        Your overall pain experience across today — not just this moment.
+      </p>
 
-function PainNrsField({
-  score,
-  recordedAt,
-  onScore,
-  onDateTime,
-  onNow,
-  onShowBanner,
-}: {
-  score: number;
-  recordedAt: string;
-  onScore: (n: number) => void;
-  onDateTime: (v: string) => void;
-  onNow: () => void;
-  onShowBanner?: (b: BannerContent) => void;
-}) {
-  const prevScoreRef = useRef(score);
-  useEffect(() => {
-    if (score !== prevScoreRef.current) {
-      prevScoreRef.current = score;
-      if (onShowBanner) {
-        onShowBanner(getPainBanner(score));
-      }
-    }
-  }, [score, onShowBanner]);
-  const swatch = painColor(score);
-  const pct = (score / 10) * 100;
-  const label =
-    score === 0
-      ? "No pain"
-      : score <= 3
-        ? "Mild"
-        : score <= 6
-          ? "Moderate"
-          : score <= 9
-            ? "Severe"
-            : "Worst ever";
-  return (
-    <div className="rounded-2xl border border-border/60 bg-muted/30 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Label className="text-xs font-medium uppercase tracking-wide text-warm-grey">
-            How is your pain right now?
-          </Label>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Numerical Rating Scale (NRS) · 0 = no pain, 10 = worst imaginable pain
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="sr-only" htmlFor="pain-when">
-            When was this pain level?
-          </label>
-          <div className="relative">
-            <Clock className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="pain-when"
-              type="datetime-local"
-              value={recordedAt}
-              onChange={(e) => onDateTime(e.target.value)}
-              className="h-9 w-[13.5rem] pl-8 text-xs"
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onNow}
-            className="h-9 rounded-full text-xs"
-          >
-            Now
-          </Button>
-        </div>
-      </div>
-
-      <h3 className="mt-6 font-serif text-xl leading-none tracking-tight">Endoscale</h3>
-      <div
-        className="mt-4"
-        role="group"
-        aria-labelledby="pain-scale-label"
-      >
-        <div id="pain-scale-label" className="sr-only">
-          Pain intensity from 0 to 10
-        </div>
-        <div className="relative h-8">
-          <div
-            className="absolute -top-1 flex -translate-x-1/2 flex-col items-center"
-            style={{ left: `${pct}%` }}
-          >
-            <div
-              className="grid h-9 w-11 place-items-center rounded-lg text-sm font-semibold text-white shadow-sm"
-              style={{ backgroundColor: swatch }}
-              aria-live="polite"
-            >
-              {score}
-            </div>
-            <div
-              className="h-2 w-2 rotate-45"
-              style={{ backgroundColor: swatch, marginTop: -4 }}
-            />
-          </div>
-        </div>
-
-        <div className="relative">
-          <div
-            className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
-            style={{
-              background:
-                "linear-gradient(to right, hsl(140 65% 45%), hsl(75 70% 45%), hsl(45 90% 50%), hsl(20 85% 50%), hsl(5 75% 45%))",
-            }}
-            aria-hidden="true"
-          />
+      <div className="mt-8 flex items-center gap-5">
+        <div className="flex-1">
           <Slider
-            value={[score]}
+            value={[pain]}
             min={0}
             max={10}
             step={1}
-            onValueChange={(v) => onScore(v[0] ?? 0)}
-            aria-label="Pain score from 0 to 10"
-            aria-valuetext={`${score} out of 10, ${label}`}
-            className="relative [&>[data-orientation=horizontal]]:bg-transparent [&_[role=slider]]:h-6 [&_[role=slider]]:w-6 [&_[role=slider]]:border-2 [&_[role=slider]]:border-foreground/70 [&_[role=slider]]:bg-background [&_[role=slider]]:shadow"
+            onValueChange={([v]) => onPain(v)}
           />
+          <div className="mt-3 flex justify-between text-xs" style={{ color: C.muted }}>
+            <span>No pain</span>
+            <span>Worst imaginable</span>
+          </div>
         </div>
+        <div
+          className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl"
+          style={{ background: C.light, color: C.deep, fontFamily: "Fraunces, serif" }}
+        >
+          <span className="text-4xl">{pain}</span>
+        </div>
+      </div>
 
-        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>0 · No pain</span>
-          {score > 0 && (
-            <span aria-hidden="true" className="font-medium" style={{ color: swatch }}>
-              {label}
-            </span>
-          )}
-          <span>10 · Worst ever</span>
-        </div>
+      <div className="mt-8 flex justify-end">
+        <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
       </div>
     </div>
   );
 }
 
-const STAGES: { id: Stage; title: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "intake", title: "Intake", desc: "Reading patient information", icon: UserRound },
-  { id: "normalising", title: "Normalisation", desc: "Structuring with clinical schemas", icon: Sparkles },
-  { id: "generating", title: "PDF generation", desc: "Composing formatted report", icon: FileText },
-];
+// ---------------- Step 2: where + what ----------------
 
-function ProgressCard({
-  stage,
-  label,
-  onReset,
+function Step2({
+  log,
+  onToggleSite,
+  onToggleDescriptor,
+  onToggleWhole,
+  onBleeding,
+  onOther,
+  onBack,
+  onContinue,
 }: {
-  stage: Stage;
-  label?: string;
-  onReset: () => void;
+  log: DailyLog;
+  onToggleSite: (site: string) => void;
+  onToggleDescriptor: (site: string, d: string) => void;
+  onToggleWhole: (s: string) => void;
+  onBleeding: (v: boolean) => void;
+  onOther: (v: string) => void;
+  onBack: () => void;
+  onContinue: () => void;
 }) {
-  const activeIdx = stage === "complete" ? STAGES.length : STAGES.findIndex((s) => s.id === stage);
-  const isError = stage === "error";
-  const done = stage === "complete";
+  const showSites = log.pain > 0;
+  const showBleedingFollowUp = log.wholeBody.includes("Bleeding");
 
   return (
-    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-powder/50 text-charcoal">
-          <Stethoscope className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="font-serif text-2xl leading-none tracking-tight">
-            {done ? "Report ready" : isError ? "Something went wrong" : "Processing"}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {label ?? (done ? "All three agents completed" : "Three-agent clinical pipeline")}
-          </p>
-        </div>
-      </div>
+    <div>
+      <h2 className="text-2xl leading-snug" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        Where, and what does it feel like?
+      </h2>
+      <p className="mt-2 text-sm" style={{ color: C.muted }}>
+        Tap what applies. We'll tuck follow-up questions under each choice.
+      </p>
 
-      <ol className="mt-8 space-y-4">
-        {STAGES.map((s, i) => {
-          const isDone = i < activeIdx;
-          const isActive = i === activeIdx && !done && !isError;
-          const Icon = s.icon;
-          return (
-            <li key={s.id} className="flex items-start gap-4">
-              <div
-                className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors ${
-                  isDone
-                    ? "bg-sage/30 text-charcoal"
-                    : isActive
-                    ? "bg-pink/40 text-charcoal"
-                    : "bg-muted text-muted-foreground"
-                }`}
+      {showSites && (
+        <div className="mt-6">
+          <SectionLabel>Pain site</SectionLabel>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PAIN_SITES.map((s) => (
+              <Chip
+                key={s.key}
+                selected={s.key in log.siteDescriptors}
+                onClick={() => onToggleSite(s.key)}
               >
-                {isDone ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : isActive ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Icon className="h-4 w-4" />
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium text-foreground">
-                    Agent {i + 1} · {s.title}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {isDone ? "Done" : isActive ? "Working" : "Waiting"}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">{s.desc}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{
-                      width: isDone ? "100%" : isActive ? "70%" : "0%",
-                    }}
-                    transition={{ duration: isActive ? 1.6 : 0.4, ease: "easeOut" }}
-                    className="h-full bg-primary"
-                  />
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-
-      {(done || isError) && (
-        <div className="mt-8">
-          <Button
-            variant="outline"
-            onClick={onReset}
-            className="rounded-full border-border/60"
-          >
-            Start a new intake
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function ReportPreview({
-  job,
-  form,
-  reportId,
-}: {
-  job: JobStatus | null;
-  form: IntakeForm;
-  reportId: string | null;
-}) {
-  const empty = !job;
-  const done = job?.status === "complete";
-  const report = job?.report;
-
-  return (
-    <Card className="sticky top-24 rounded-3xl border-border/60 bg-card p-7 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-butter/50 text-charcoal">
-            <FileText className="h-5 w-5" />
+                {s.key}
+              </Chip>
+            ))}
           </div>
-          <div>
-            <h2 className="font-serif text-2xl leading-none tracking-tight">Report preview</h2>
-            {done && (
-              <p className="mt-1 text-xs text-muted-foreground">Structured output from agent 3</p>
+          <div className="mt-3 space-y-3">
+            {PAIN_SITES.map((s) =>
+              s.key in log.siteDescriptors ? (
+                <NestedCard key={s.key} title={s.key}>
+                  <div className="flex flex-wrap gap-2">
+                    {s.options.map((opt) => (
+                      <Chip
+                        key={opt}
+                        size="sm"
+                        selected={(log.siteDescriptors[s.key] ?? []).includes(opt)}
+                        onClick={() => onToggleDescriptor(s.key, opt)}
+                      >
+                        {opt}
+                      </Chip>
+                    ))}
+                  </div>
+                </NestedCard>
+              ) : null,
             )}
           </div>
         </div>
-        {done && <DownloadButton job={job} reportId={reportId} />}
-      </div>
+      )}
 
-      <div className="mt-6 rounded-2xl border border-border/60 bg-parchment p-6 shadow-inner">
-        {empty ? (
-          <EmptyPreview />
-        ) : done && report ? (
-          <RenderedReport report={report} form={form} />
-        ) : job?.status === "error" ? (
-          <div className="py-10 text-center text-sm text-destructive">
-            {job.error ?? "The pipeline failed."}
-          </div>
-        ) : (
-          <SkeletonPreview />
+      <div className="mt-6">
+        <SectionLabel>Whole body symptoms</SectionLabel>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {WHOLE_BODY.map((s) => (
+            <Chip key={s} selected={log.wholeBody.includes(s)} onClick={() => onToggleWhole(s)}>
+              {s}
+            </Chip>
+          ))}
+        </div>
+        {showBleedingFollowUp && (
+          <NestedCard title="Is this bleeding outside your expected period window?" className="mt-3">
+            <div className="flex gap-2">
+              <Chip selected={log.bleedingUnexpected === true} onClick={() => onBleeding(true)}>
+                Yes
+              </Chip>
+              <Chip selected={log.bleedingUnexpected === false} onClick={() => onBleeding(false)}>
+                No
+              </Chip>
+            </div>
+          </NestedCard>
         )}
       </div>
-    </Card>
-  );
-}
 
-function DownloadButton({
-  job,
-  reportId,
-}: {
-  job: JobStatus;
-  reportId: string | null;
-}) {
-  const id = reportId ?? job.report_id ?? null;
-  return (
-    <button
-      type="button"
-      onClick={() => id && api.downloadReport(id)}
-      disabled={!id}
-      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-      title="Fetches the PDF from the backend (mock today, FastAPI later)."
-    >
-      <Download className="h-4 w-4" />
-      Download PDF
-    </button>
-  );
-}
-
-function generateClientPdf(report: JobStatus["report"] | undefined, form: IntakeForm) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 48;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const maxWidth = pageWidth - margin * 2;
-  let y = margin;
-
-  const ensureSpace = (needed: number) => {
-    if (y + needed > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text("Maai · Symptom record", margin, y);
-  y += 26;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(110);
-  doc.text(new Date().toLocaleString(), margin, y);
-  y += 20;
-  doc.setTextColor(20);
-
-  const patient = report?.patient ?? {
-    Name: form.patient_name,
-    "Date of birth": form.dob,
-    Sex: form.sex,
-    Clinician: form.clinician,
-  };
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("Patient", margin, y);
-  y += 16;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  for (const [k, v] of Object.entries(patient)) {
-    if (!v) continue;
-    ensureSpace(16);
-    doc.text(`${k}: ${v}`, margin, y);
-    y += 14;
-  }
-  y += 8;
-
-  const sections = report?.sections ?? [
-    { title: "Notes", content: form.notes || "(no notes)" },
-  ];
-  for (const section of sections) {
-    ensureSpace(28);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text(section.title, margin, y);
-    y += 16;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    const lines = doc.splitTextToSize(section.content ?? "", maxWidth) as string[];
-    for (const line of lines) {
-      ensureSpace(14);
-      doc.text(line, margin, y);
-      y += 14;
-    }
-    y += 10;
-  }
-
-  const safeName = (form.patient_name || "record").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase();
-  doc.save(`maai-${safeName}-${new Date().toISOString().slice(0, 10)}.pdf`);
-}
-
-function EmptyPreview() {
-  return (
-    <div className="py-12 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-pink/30 text-charcoal">
-        <FileText className="h-5 w-5" />
-      </div>
-      <p className="mt-4 font-serif text-lg">Your report will appear here</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Submit the intake form to start the pipeline.
-      </p>
-    </div>
-  );
-}
-
-function SkeletonPreview() {
-  return (
-    <div className="space-y-4">
-      {[80, 60, 90, 70, 50, 85].map((w, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0.4 }}
-          animate={{ opacity: [0.4, 0.8, 0.4] }}
-          transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.1 }}
-          className="h-3 rounded-full bg-stone/60"
-          style={{ width: `${w}%` }}
+      <div className="mt-6">
+        <SectionLabel>Other symptoms</SectionLabel>
+        <Textarea
+          value={log.otherSymptoms}
+          onChange={(e) => onOther(e.target.value)}
+          rows={3}
+          placeholder="Anything not listed, for example headaches or spotting."
+          className="mt-2 resize-none rounded-2xl"
+          style={{ background: "#fff", borderColor: C.border, color: C.text }}
         />
-      ))}
+      </div>
+
+      <div className="mt-8 flex justify-between">
+        <GhostButton onClick={onBack}>Back</GhostButton>
+        <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
+      </div>
     </div>
   );
 }
 
-function RenderedReport({
-  report,
-  form,
+// ---------------- Step 3: impact + medication ----------------
+
+function Step3({
+  log,
+  onImpact,
+  onMedName,
+  onMedEffect,
+  onBack,
+  onSubmit,
 }: {
-  report: { patient?: Record<string, string>; sections: ReportSection[] };
-  form: IntakeForm;
+  log: DailyLog;
+  onImpact: (v: Impact) => void;
+  onMedName: (v: string) => void;
+  onMedEffect: (v: MedEffect) => void;
+  onBack: () => void;
+  onSubmit: () => void;
 }) {
-  const patient = report.patient ?? {
-    Name: form.patient_name || "—",
-    DOB: form.dob || "—",
-    Sex: form.sex || "—",
-    Clinician: form.clinician || "—",
-  };
   return (
-    <article className="space-y-6 text-charcoal">
-      <header className="border-b border-stone/40 pb-4">
-        <div className="text-[10px] uppercase tracking-[0.22em] text-warm-grey">
-          Intelly clinical report
-        </div>
-        <h3 className="mt-1 font-serif text-2xl leading-tight">
-          {patient.Name || patient.name || "Patient report"}
+    <div>
+      <h2 className="text-2xl leading-snug" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        Did symptoms stop you doing anything today?
+      </h2>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {IMPACT_OPTIONS.map((opt) => (
+          <Chip
+            key={opt.label}
+            selected={log.impactChosen && log.impact === opt.value}
+            onClick={() => onImpact(opt.value)}
+          >
+            {opt.label}
+          </Chip>
+        ))}
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-lg" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+          Took any medication for it?
         </h3>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-warm-grey">
-          {Object.entries(patient).map(([k, v]) => (
-            <div key={k} className="flex gap-1">
-              <dt className="font-medium">{k}:</dt>
-              <dd>{v || "—"}</dd>
-            </div>
+        <Input
+          value={log.medicationName}
+          onChange={(e) => onMedName(e.target.value)}
+          placeholder="Name it, for example ibuprofen 400mg or heat pack."
+          className="mt-3 rounded-full"
+          style={{ background: "#fff", borderColor: C.border, color: C.text }}
+        />
+        <div className="mt-3 flex flex-wrap gap-2">
+          {MED_EFFECT.map((e) => (
+            <Chip
+              key={e}
+              selected={log.medicationEffect === e}
+              onClick={() => onMedEffect(log.medicationEffect === e ? null : e)}
+            >
+              {e}
+            </Chip>
           ))}
-        </dl>
-      </header>
-      {report.sections.map((s) => (
-        <section key={s.title}>
-          <h4 className="font-serif text-base uppercase tracking-wide text-charcoal">
-            {s.title}
-          </h4>
-          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-charcoal/85">
-            {s.content}
-          </p>
-        </section>
-      ))}
-    </article>
+        </div>
+      </div>
+
+      <div className="mt-8 flex justify-between">
+        <GhostButton onClick={onBack}>Back</GhostButton>
+        <PrimaryButton onClick={onSubmit}>Log today</PrimaryButton>
+      </div>
+    </div>
   );
 }
 
-// ---------- Demo pipeline (used when no VITE_API_BASE_URL is configured) ----------
-function runMockPipeline(form: IntakeForm, set: (j: JobStatus) => void) {
-  const steps: JobStatus[] = [
-    { status: "intake", stage_label: "Agent 1 · reading patient information" },
-    { status: "normalising", stage_label: "Agent 2 · normalising with Anthropic" },
-    { status: "generating", stage_label: "Agent 3 · composing PDF with fpdf2" },
-  ];
-  let i = 0;
-  const tick = () => {
-    if (i < steps.length) {
-      set(steps[i]);
-      i++;
-      window.setTimeout(tick, 1600);
-    } else {
-      set({
-        status: "complete",
-        stage_label: "Pipeline complete",
-        report: buildMockReport(form),
-      });
-    }
-  };
-  window.setTimeout(tick, 400);
+// ---------------- Confirmation ----------------
+
+function ConfirmationCard({ log, onBack }: { log: DailyLog; onBack: () => void }) {
+  const score = calcScore({
+    pain: log.pain,
+    siteDescriptors: log.siteDescriptors,
+    wholeBody: log.wholeBody,
+    bleedingUnexpected: log.bleedingUnexpected,
+    impact: log.impactChosen ? log.impact : 0,
+  });
+  return (
+    <SoftCard>
+      <div className="grid place-items-center py-6 text-center">
+        <Flower severity={score.severity} size={72} />
+        <h2 className="mt-5 text-2xl" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+          Logged, see you tomorrow.
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: C.muted }}>
+          {new Date(log.loggedAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })}
+        </p>
+        <div className="mt-6 flex items-baseline gap-2">
+          <span style={{ fontFamily: "Fraunces, serif", color: C.deep }} className="text-5xl">
+            {score.total}
+          </span>
+          <span className="text-sm" style={{ color: C.muted }}>/ 100</span>
+        </div>
+        <SeverityPill severity={score.severity} />
+
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <GhostButton onClick={onBack}>Back to daily log</GhostButton>
+          <PrimaryButton
+            onClick={() => {
+              const el = document.getElementById("report-preview");
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            View report preview
+          </PrimaryButton>
+        </div>
+      </div>
+    </SoftCard>
+  );
 }
 
-function buildMockReport(form: IntakeForm) {
-  const name = form.patient_name || "Patient";
-  return {
-    patient: {
-      Name: name,
-      DOB: form.dob || "—",
-      Sex: form.sex || "—",
-      Clinician: form.clinician || "—",
-      "Report ID": `INT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-    },
-    sections: [
-      {
-        title: "Presenting complaint",
-        content:
-          form.notes.slice(0, 220) ||
-          "Intermittent chest tightness for three days, worse on exertion.",
-      },
-      {
-        title: "History",
-        content:
-          "Hypertension on amlodipine 5mg daily. No prior cardiac events. Non-smoker. Occasional alcohol use.",
-      },
-      {
-        title: "Examination",
-        content:
-          "BP 148/92 mmHg. HR 88 bpm, regular. Chest clear to auscultation. Heart sounds normal, no murmurs. No peripheral oedema.",
-      },
-      {
-        title: "Assessment",
-        content:
-          "Suspected exertional angina in a patient with poorly controlled hypertension. Cardiovascular risk stratification indicated.",
-      },
-      {
-        title: "Plan",
-        content:
-          "1. ECG and troponin today.\n2. Optimise antihypertensive therapy — review amlodipine dose.\n3. Refer to cardiology for exercise tolerance testing.\n4. Safety-net advice provided regarding chest pain red flags.",
-      },
-    ],
-  };
+// ---------------- Burden panel ----------------
+
+function BurdenPanel({ score, flare }: { score: ScoreBreakdown; flare: FlareState }) {
+  return (
+    <div className="md:sticky md:top-20">
+      <SoftCard>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: C.muted }}>
+          Today's burden score
+        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <Flower severity={score.severity} size={56} />
+          <div>
+            <div className="flex items-baseline gap-1.5">
+              <span
+                style={{ fontFamily: "Fraunces, serif", color: C.deep }}
+                className="text-4xl leading-none"
+              >
+                {score.total}
+              </span>
+              <span className="text-sm" style={{ color: C.muted }}>/ 100</span>
+            </div>
+            <SeverityPill severity={score.severity} />
+          </div>
+        </div>
+
+        <div className="mt-5 h-2 w-full overflow-hidden rounded-full" style={{ background: C.border }}>
+          <div
+            className="h-full transition-all"
+            style={{ width: `${score.total}%`, background: C.accent }}
+          />
+        </div>
+
+        <ul className="mt-5 space-y-2 text-sm" style={{ color: C.text }}>
+          <BreakdownRow label={`Pain × 5`} value={score.pain} />
+          <BreakdownRow label="Impact" value={score.impact} />
+          <BreakdownRow
+            label={`Symptoms +3 each (cap 15)`}
+            value={score.symptoms}
+            hint={`${score.symptomCount} counted`}
+          />
+          <BreakdownRow label="Unexpected bleeding" value={score.bleeding} />
+        </ul>
+
+        <FlareMessage flare={flare} />
+      </SoftCard>
+    </div>
+  );
 }
 
-// ---------- Timeline ----------
-
-const KEYWORD_TERMS: { pattern: RegExp; term: string }[] = [
-  { pattern: /cramp|period pain|menstrual pain/i, term: "Dysmenorrhea" },
-  { pattern: /pelvi|lower abdomen|low(er)? belly/i, term: "Pelvic pain" },
-  { pattern: /left side|left-sided|left flank/i, term: "Left-sided pain" },
-  { pattern: /right side|right-sided|right flank/i, term: "Right-sided pain" },
-  { pattern: /bloat|swollen|distend/i, term: "Bloating" },
-  { pattern: /nausea|sick to stomach|vomit/i, term: "Nausea" },
-  { pattern: /fatigue|exhaust|drained|tired/i, term: "Fatigue" },
-  { pattern: /heavy bleed|clots|flooding/i, term: "Heavy menstrual bleeding" },
-  { pattern: /spotting|between periods|irregular bleed/i, term: "Intermenstrual bleeding" },
-  { pattern: /pain during sex|dyspareunia|painful intercourse/i, term: "Dyspareunia" },
-  { pattern: /pain(ful)? (when )?(peeing|urinating)|burning wee/i, term: "Dysuria" },
-  { pattern: /pain(ful)? (during|when)? ?(bowel|poo|stool|defec)/i, term: "Dyschezia" },
-  { pattern: /woke|waking|night sweat|insomnia/i, term: "Sleep disruption" },
-  { pattern: /headache|migraine/i, term: "Headache" },
-  { pattern: /back pain|lower back/i, term: "Lower back pain" },
-  { pattern: /leg pain|radiat/i, term: "Radiating leg pain" },
-  { pattern: /mood|anxious|low mood|depress/i, term: "Mood change" },
-];
-
-function deriveTerms(job: JobStatus, form: IntakeForm): string[] {
-  if (job.terms && job.terms.length) return dedupe(job.terms).slice(0, 6);
-  const notes = form.notes || "";
-  const matched = KEYWORD_TERMS.filter(({ pattern }) => pattern.test(notes)).map((k) => k.term);
-  if (matched.length) return dedupe(matched).slice(0, 6);
-  // Fall back to report section titles if available (real backend)
-  if (job.report?.sections?.length) {
-    return dedupe(job.report.sections.map((s) => s.title)).slice(0, 6);
-  }
-  return ["Symptom logged"];
+function BreakdownRow({ label, value, hint }: { label: string; value: number; hint?: string }) {
+  return (
+    <li className="flex items-center justify-between">
+      <span style={{ color: C.muted }}>
+        {label}
+        {hint && <span className="ml-1 text-xs">({hint})</span>}
+      </span>
+      <span style={{ color: C.text, fontFamily: "Fraunces, serif" }}>+{value}</span>
+    </li>
+  );
 }
 
-function dedupe<T>(arr: T[]) {
-  return Array.from(new Set(arr));
+function FlareMessage({ flare }: { flare: FlareState }) {
+  const bg =
+    flare.kind === "confirms"
+      ? C.pink
+      : flare.kind === "elevated"
+        ? C.light
+        : flare.kind === "below"
+          ? C.green
+          : C.blue;
+  return (
+    <div
+      className="mt-5 flex items-start gap-2 rounded-2xl p-3 text-xs"
+      style={{ background: bg, color: C.text }}
+    >
+      <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{flare.message}</span>
+    </div>
+  );
 }
 
-function TimelineCard({
-  entries,
+// ---------------- Pattern over time ----------------
+
+function PatternOverTime({
+  logs,
   onDelete,
   onClear,
 }: {
-  entries: LogEntry[];
+  logs: DailyLog[];
   onDelete: (id: string) => void;
   onClear: () => void;
 }) {
-  const empty = entries.length === 0;
-  const topTerms = computeTopTerms(entries).slice(0, 6);
+  const empty = logs.length === 0;
+  const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
+  const recurring = useMemo(() => recurringTerms(logs), [logs]);
 
   return (
-    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-sage/40 text-charcoal">
-            <Clock className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="font-serif text-2xl leading-none tracking-tight">Pattern over time</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {empty
-                ? "Your logged entries and mapped clinical terms will appear here."
-                : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} · saved on this device`}
-            </p>
-          </div>
+    <SoftCard>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:justify-between">
+        <div className="min-w-0">
+          <h2
+            className="truncate text-2xl"
+            style={{ fontFamily: "Fraunces, serif", color: C.text }}
+          >
+            Pattern over time
+          </h2>
+          <p className="mt-1 text-xs" style={{ color: C.muted }}>
+            {empty
+              ? "Your saved daily logs will build here."
+              : `${logs.length} ${logs.length === 1 ? "log" : "logs"} · saved on this device`}
+          </p>
         </div>
         {!empty && (
-          <button
-            onClick={onClear}
-            className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
+          <button onClick={onClear} className="shrink-0 text-xs underline" style={{ color: C.muted }}>
             Clear all
           </button>
         )}
       </div>
 
-      {!empty && topTerms.length > 0 && (
-        <div className="mt-6">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-warm-grey">
-            Recurring terms
-          </div>
+      {!empty && recurring.length > 0 && (
+        <div className="mt-5">
+          <SectionLabel>Recurring terms</SectionLabel>
           <div className="mt-3 flex flex-wrap gap-2">
-            {topTerms.map(({ term, count }) => (
+            {recurring.map(({ term, count }) => (
               <span
                 key={term}
-                className="inline-flex items-center gap-1.5 rounded-full bg-pink/25 px-3 py-1 text-xs font-medium text-charcoal"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs"
+                style={{ background: C.pink, color: C.text }}
               >
                 {term}
-                <span className="rounded-full bg-charcoal/10 px-1.5 text-[10px]">{count}</span>
+                <span
+                  className="rounded-full px-1.5 text-[10px]"
+                  style={{ background: "rgba(0,0,0,0.08)" }}
+                >
+                  {count}
+                </span>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-6">
         {empty ? (
-          <TimelineEmpty />
+          <div
+            className="rounded-2xl border border-dashed py-10 text-center text-sm"
+            style={{ borderColor: C.border, color: C.muted, background: C.bg }}
+          >
+            No entries yet. Complete a daily log above.
+          </div>
         ) : (
-          <ol className="relative space-y-6 border-l border-stone/60 pl-6">
+          <ol className="space-y-4">
             <AnimatePresence initial={false}>
-              {entries.map((entry) => (
-                <TimelineEntry key={entry.id} entry={entry} onDelete={onDelete} />
+              {logs.map((log) => (
+                <TimelineEntry
+                  key={log.id}
+                  log={log}
+                  isFlare={flare.ids.has(log.id)}
+                  onDelete={onDelete}
+                />
               ))}
             </AnimatePresence>
           </ol>
         )}
       </div>
-    </Card>
-  );
-}
-
-function TimelineEmpty() {
-  return (
-    <div className="rounded-2xl border border-dashed border-border/70 bg-parchment/60 py-12 text-center">
-      <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-powder/40 text-charcoal">
-        <Clock className="h-4 w-4" />
-      </div>
-      <p className="mt-4 font-serif text-lg text-charcoal">No entries yet</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Submit an intake above — it will appear here with the clinical terms Maai extracted.
-      </p>
-    </div>
+    </SoftCard>
   );
 }
 
 function TimelineEntry({
-  entry,
+  log,
+  isFlare,
   onDelete,
 }: {
-  entry: LogEntry;
+  log: DailyLog;
+  isFlare: boolean;
   onDelete: (id: string) => void;
 }) {
-  const date = new Date(entry.submittedAt);
+  const score = calcScore({
+    pain: log.pain,
+    siteDescriptors: log.siteDescriptors,
+    wholeBody: log.wholeBody,
+    bleedingUnexpected: log.bleedingUnexpected,
+    impact: log.impactChosen ? log.impact : 0,
+  });
+  const summary = summarise(log);
+  const dt = new Date(log.loggedAt);
   return (
     <motion.li
       layout
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.25 }}
-      className="relative"
+      exit={{ opacity: 0, y: -6 }}
+      className="rounded-2xl border p-4"
+      style={{ borderColor: C.border, background: "#fff" }}
     >
-      <span
-        aria-hidden
-        className="absolute -left-[31px] top-1.5 grid h-4 w-4 place-items-center rounded-full border-2 border-background bg-primary"
-      />
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <div className="flex items-baseline gap-3">
-          <span className="font-serif text-base text-charcoal">{formatDate(date)}</span>
-          <span className="text-xs text-warm-grey">{formatTime(date)}</span>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
+        <Flower severity={score.severity} size={36} outlined={isFlare} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span style={{ fontFamily: "Fraunces, serif", color: C.text }} className="text-base">
+              {dt.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+            </span>
+            <span className="text-xs" style={{ color: C.muted }}>
+              {dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+              style={{ background: severityColor(score.severity), color: C.text }}
+            >
+              {score.severity} · {score.total}
+            </span>
+            {isFlare && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "transparent", color: C.deep, border: `1px solid ${C.deep}` }}
+              >
+                Flare
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-sm leading-relaxed" style={{ color: C.text }}>
+            {summary}
+          </p>
+          {log.otherSymptoms && (
+            <p className="mt-1 text-xs italic" style={{ color: C.muted }}>
+              Notes: {log.otherSymptoms}
+            </p>
+          )}
         </div>
         <button
-          onClick={() => onDelete(entry.id)}
-          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
-          aria-label="Delete entry"
+          onClick={() => onDelete(log.id)}
+          className="shrink-0 rounded-full p-1.5"
+          aria-label="Remove"
+          style={{ color: C.muted }}
         >
-          <Trash2 className="h-3 w-3" />
-          Remove
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      {entry.notesExcerpt && (
-        <p className="mt-2 rounded-2xl border border-border/60 bg-parchment px-4 py-3 text-sm leading-relaxed text-charcoal">
-          &ldquo;{entry.notesExcerpt}
-          {entry.notesExcerpt.length >= 220 ? "…" : ""}&rdquo;
-        </p>
-      )}
-      {entry.terms.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {entry.terms.map((t, i) => (
-            <span
-              key={`${entry.id}-${t}`}
-              className="rounded-full px-3 py-1 text-xs font-medium text-charcoal"
-              style={{
-                background: `color-mix(in oklab, var(--color-${TINT_ROTATION[i % TINT_ROTATION.length]}) 45%, transparent)`,
-              }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
     </motion.li>
   );
 }
 
-const TINT_ROTATION = ["pink", "powder", "butter", "sage"] as const;
+function summarise(log: DailyLog): string {
+  const parts: string[] = [];
+  parts.push(`Pain ${log.pain} out of 10`);
+  const descs: string[] = [];
+  for (const [site, ds] of Object.entries(log.siteDescriptors)) {
+    if (ds.length === 0) descs.push(site.toLowerCase());
+    else descs.push(`${site.toLowerCase()} (${ds.map((d) => d.toLowerCase()).join(", ")})`);
+  }
+  if (descs.length) parts[0] += ` with ${descs.join("; ")}`;
+  if (log.wholeBody.length) {
+    parts[0] += (descs.length ? ", " : " with ") + log.wholeBody.map((s) => s.toLowerCase()).join(", ");
+  }
+  parts[0] += ".";
 
-function computeTopTerms(entries: LogEntry[]): { term: string; count: number }[] {
+  const impactStr = log.impactChosen
+    ? log.impact === 0
+      ? "Symptoms didn't affect activities."
+      : log.impact === 15
+        ? "Symptoms affected some activities."
+        : "Symptoms affected most activities."
+    : "";
+  if (impactStr) parts.push(impactStr);
+
+  if (log.medicationName && log.medicationEffect) {
+    const eff =
+      log.medicationEffect === "Helped"
+        ? "helped"
+        : log.medicationEffect === "Partly"
+          ? "partly helped"
+          : "had no effect";
+    parts.push(`${log.medicationName} ${eff}.`);
+  }
+  if (log.bleedingUnexpected) parts.push("Bleeding outside expected window.");
+  return parts.join(" ");
+}
+
+function recurringTerms(logs: DailyLog[]): { term: string; count: number }[] {
   const counts = new Map<string, number>();
-  for (const e of entries) {
-    for (const term of e.terms) {
-      counts.set(term, (counts.get(term) ?? 0) + 1);
+  const bump = (t: string) => counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const l of logs) {
+    for (const site of Object.keys(l.siteDescriptors)) {
+      const desc = l.siteDescriptors[site];
+      if (site === "Pelvis") bump("Pelvic pain");
+      else if (site === "Lower back") bump("Lower back pain");
+      else if (site === "Bowel" && desc.includes("Pain with bowel movements"))
+        bump("Pain with bowel movements");
+      else if (site === "Bladder" && desc.includes("Pain when urinating"))
+        bump("Pain when urinating");
+      else if (site === "During or after sex") bump("Pain with sex");
     }
+    for (const s of l.wholeBody) bump(s);
+    if (l.bleedingUnexpected) bump("Unexpected bleeding");
   }
   return Array.from(counts.entries())
     .map(([term, count]) => ({ term, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+// ---------------- Report preview ----------------
+
+function ReportPreviewCard({
+  logs,
+  onGenerated,
+}: {
+  logs: DailyLog[];
+  onGenerated: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const stats = useMemo(() => {
+    if (logs.length === 0) return null;
+    const avg = Math.round(logs.reduce((a, l) => a + l.burden, 0) / logs.length);
+    const peak = Math.max(...logs.map((l) => l.burden));
+    const painDays = logs.filter((l) => l.pain > 0).length;
+    const topSymptoms = recurringTerms(logs).slice(0, 5);
+    const impactCounts = { 0: 0, 15: 0, 25: 0 } as Record<number, number>;
+    logs.forEach((l) => {
+      if (l.impactChosen) impactCounts[l.impact] += 1;
+    });
+    const medCounts: Record<string, number> = {};
+    logs.forEach((l) => {
+      if (l.medicationEffect) medCounts[l.medicationEffect] = (medCounts[l.medicationEffect] ?? 0) + 1;
+    });
+
+    const { episodes } = flareEpisodeIds(logs);
+    const longest = episodes.reduce((m, e) => Math.max(m, e.length), 0);
+    let aboveThreshold = 0;
+    const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+    for (const l of sorted) {
+      const { baseline } = computeBaseline(sorted, l.date);
+      const t = flareThreshold(baseline);
+      if (t != null && l.burden > t) aboveThreshold += 1;
+    }
+
+    return { avg, peak, painDays, topSymptoms, impactCounts, medCounts, episodes: episodes.length, longest, aboveThreshold };
+  }, [logs]);
+
+  async function generate() {
+    if (logs.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const text = buildReportText(logs);
+      const res = await api.processPatientIntake({
+        patient_name: "You",
+        input_text: text,
+      });
+      if (res.status === "error") throw new Error("Backend returned error");
+      onGenerated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not generate report");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <SoftCard id="report-preview">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-2xl" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+          Report preview
+        </h2>
+        <FileText className="h-5 w-5" style={{ color: C.muted }} />
+      </div>
+
+      {!stats ? (
+        <div
+          className="mt-4 rounded-2xl border border-dashed py-10 text-center text-sm"
+          style={{ borderColor: C.border, color: C.muted, background: C.bg }}
+        >
+          Log at least one day to see your clinician-friendly summary.
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="Logged days" value={logs.length} />
+            <StatTile label="Average burden" value={stats.avg} />
+            <StatTile label="Peak burden" value={stats.peak} />
+            <StatTile label="Pain days" value={stats.painDays} />
+            <StatTile label="Flare episodes" value={stats.episodes} />
+            <StatTile label="Longest flare" value={`${stats.longest}d`} />
+            <StatTile label="Days above threshold" value={stats.aboveThreshold} />
+            <StatTile
+              label="Impact"
+              value={`${stats.impactCounts[0] || 0}/${stats.impactCounts[15] || 0}/${stats.impactCounts[25] || 0}`}
+              hint="none / some / most"
+            />
+          </div>
+
+          <div className="mt-5">
+            <SectionLabel>Most common symptoms</SectionLabel>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {stats.topSymptoms.map((s) => (
+                <span
+                  key={s.term}
+                  className="rounded-full px-3 py-1 text-xs"
+                  style={{ background: C.blue, color: C.text }}
+                >
+                  {s.term} · {s.count}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {Object.keys(stats.medCounts).length > 0 && (
+            <div className="mt-5">
+              <SectionLabel>Medication response</SectionLabel>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Object.entries(stats.medCounts).map(([k, v]) => (
+                  <span
+                    key={k}
+                    className="rounded-full px-3 py-1 text-xs"
+                    style={{ background: C.green, color: C.text }}
+                  >
+                    {k} · {v}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5">
+            <SectionLabel>Recent pattern</SectionLabel>
+            <ul className="mt-2 space-y-1 text-sm" style={{ color: C.text }}>
+              {logs.slice(0, 5).map((l) => (
+                <li key={l.id}>
+                  <span style={{ color: C.muted }}>
+                    {new Date(l.date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}:
+                  </span>{" "}
+                  burden {l.burden}, {summarise(l)}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-2xl p-3 text-sm" style={{ background: C.pink, color: C.text }}>
+              {error}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end">
+            <PrimaryButton onClick={generate} disabled={submitting}>
+              {submitting ? "Generating…" : "Generate report"}
+            </PrimaryButton>
+          </div>
+        </>
+      )}
+    </SoftCard>
+  );
 }
-function formatTime(d: Date) {
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+function buildReportText(logs: DailyLog[]): string {
+  const lines: string[] = [];
+  lines.push(`Daily log summary — ${logs.length} logs.`);
+  const avg = Math.round(logs.reduce((a, l) => a + l.burden, 0) / logs.length);
+  const peak = Math.max(...logs.map((l) => l.burden));
+  lines.push(`Average burden ${avg}/100, peak ${peak}/100.`);
+  const recent = logs.slice(0, 10);
+  lines.push("", "Recent entries:");
+  for (const l of recent) {
+    lines.push(`- ${l.date}: burden ${l.burden} — ${summarise(l)}`);
+  }
+  return lines.join("\n");
 }
 
-
-// ---------- API adapters ----------
-
-/**
- * Adapt the structured report shape returned by the API service into the
- * section-based shape the existing `RenderedReport` component understands.
- * When the real FastAPI backend returns a schema compatible with
- * `StructuredReport`, this stays; if it returns something else, edit only
- * this function.
- */
-function toLegacyReport(s: StructuredReport): JobStatus["report"] {
-  const patient: Record<string, string> = {
-    Name: s.patient.name,
-    DOB: s.patient.dob || "—",
-    Sex: s.patient.sex || "—",
-    Clinician: s.patient.clinician || "—",
-  };
-  const bullet = (items: string[]) => items.map((i) => `• ${i}`).join("\n");
-  return {
-    patient,
-    sections: [
-      { title: "Patient summary", content: s.patient_summary },
-      { title: "Key findings", content: bullet(s.key_findings) },
-      { title: "Risk indicators", content: bullet(s.risk_indicators) },
-      { title: "Recommendations", content: bullet(s.recommendations) },
-      { title: "Follow-up actions", content: bullet(s.follow_up_actions) },
-    ],
-  };
+function StatTile({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
+  return (
+    <div className="rounded-2xl p-3" style={{ background: C.bg }}>
+      <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
+        {label}
+      </div>
+      <div
+        className="mt-1 text-2xl"
+        style={{ fontFamily: "Fraunces, serif", color: C.text }}
+      >
+        {value}
+      </div>
+      {hint && <div className="text-[10px]" style={{ color: C.muted }}>{hint}</div>}
+    </div>
+  );
 }
 
-/**
- * Client-side visual stagger through the three agents while the real API
- * request is in flight. Purely cosmetic — the pipeline runs on the server.
- */
-function animateStages(
-  setJob: (j: JobStatus) => void,
-  timerRef: React.MutableRefObject<number | null>,
-) {
-  const steps: JobStatus[] = [
-    { status: "intake", stage_label: "Agent 1 · Intake" },
-    { status: "normalising", stage_label: "Agent 2 · Normalisation" },
-    { status: "generating", stage_label: "Agent 3 · PDF report" },
-  ];
-  let i = 0;
-  const tick = () => {
-    if (i >= steps.length) return;
-    setJob(steps[i]);
-    i++;
-    timerRef.current = window.setTimeout(tick, 650);
-  };
-  tick();
-}
-
-// ---------- Report history (server-backed) ----------
+// ---------------- Report history (server) ----------------
 
 function ReportHistoryCard({ refreshKey }: { refreshKey: number }) {
   const [reports, setReports] = useState<ApiReport[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoadError(null);
+    setError(null);
     api
       .getReports(20)
       .then((data) => {
         if (!cancelled) setReports(data);
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setLoadError(err instanceof Error ? err.message : "Could not load history");
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load history");
       });
     return () => {
       cancelled = true;
     };
   }, [refreshKey]);
 
-  async function handleDelete(id: string) {
-    setLoadError(null);
+  async function del(id: string) {
     try {
       await api.deleteReport(id);
       setReports((prev) => (prev ? prev.filter((r) => r.id !== id) : null));
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Delete failed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
     }
   }
 
   return (
-    <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-powder/50 text-charcoal">
-            <FileText className="h-5 w-5" />
+    <SoftCard>
+      <h2 className="text-2xl" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+        Report history
+      </h2>
+      <div className="mt-5">
+        {error ? (
+          <div className="rounded-2xl p-3 text-sm" style={{ background: C.pink, color: C.text }}>
+            {error}
           </div>
-          <div>
-            <h2 className="font-serif text-2xl leading-none tracking-tight">
-              Report history
-            </h2>
+        ) : reports === null ? (
+          <div className="space-y-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-2xl" style={{ background: C.bg }} />
+            ))}
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          {collapsed ? "Expand" : "Collapse"}
-        </button>
-      </div>
-
-      {!collapsed && (
-        <div className="mt-6">
-          {loadError ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {loadError}
-            </div>
-          ) : reports === null ? (
-            <div className="space-y-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-2xl bg-stone/40" />
-              ))}
-            </div>
-          ) : reports.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
-              No reports yet. Submit an intake above to generate the first one.
-            </div>
-          ) : (
-            <ul className="divide-y divide-border/60">
-              {reports.map((r) => {
-                const s = r.structured_data;
-                const title = s?.patient?.name ?? "Patient report";
-                const summary = s?.patient_summary ?? "—";
-                return (
-                  <li key={r.id} className="flex flex-wrap items-start justify-between gap-4 py-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-foreground">{title}</span>
-                        <StatusPill status={r.status} />
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(r.created_at).toLocaleString()}
-                        </span>
+        ) : reports.length === 0 ? (
+          <div
+            className="rounded-2xl border border-dashed p-6 text-center text-sm"
+            style={{ borderColor: C.border, color: C.muted, background: C.bg }}
+          >
+            No reports yet. Generate one from the preview above.
+          </div>
+        ) : (
+          <ul className="divide-y" style={{ borderColor: C.border }}>
+            {reports.map((r) => {
+              const s = r.structured_data;
+              const title = s?.patient?.name ?? "Patient report";
+              const summary = s?.patient_summary ?? "—";
+              return (
+                <li key={r.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-4 sm:flex sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-semibold" style={{ color: C.text }}>{title}</span>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+                        style={{
+                          background: r.status === "complete" ? C.green : C.light,
+                          color: C.text,
+                        }}
+                      >
+                        {r.status}
+                      </span>
+                      <span className="text-xs" style={{ color: C.muted }}>
+                        {new Date(r.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm" style={{ color: C.muted }}>{summary}</p>
+                    {s?.clinical_terms && s.clinical_terms.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {s.clinical_terms.slice(0, 6).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full px-2 py-0.5 text-[11px]"
+                            style={{ background: C.pink, color: C.text }}
+                          >
+                            {t}
+                          </span>
+                        ))}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                        {summary}
-                      </p>
-                      {s?.clinical_terms && s.clinical_terms.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {s.clinical_terms.slice(0, 6).map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-full bg-pink/25 px-2.5 py-0.5 text-[11px] font-medium text-charcoal"
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r.id)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-destructive hover:border-destructive/40"
-                        title="Delete report"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => api.downloadReport(r.id)}
-                        disabled={r.status !== "complete"}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        PDF
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function StatusPill({ status }: { status: ApiReport["status"] }) {
-  const config: Record<ApiReport["status"], { label: string; className: string }> = {
-    complete: { label: "Complete", className: "bg-sage/40 text-charcoal" },
-    processing: { label: "Processing", className: "bg-butter/50 text-charcoal" },
-    pending: { label: "Pending", className: "bg-stone/50 text-charcoal" },
-    error: { label: "Error", className: "bg-destructive/15 text-destructive" },
-  };
-  const c = config[status] ?? config.pending;
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${c.className}`}
-    >
-      {c.label}
-    </span>
-  );
-}
-
-// ============================================================
-// SOCRATES questionnaire
-// ============================================================
-
-const SOCRATES_SECTIONS = {
-  site: [
-    "Pelvis",
-    "Lower back",
-    "Lower abdomen (left)",
-    "Lower abdomen (right)",
-    "Legs",
-    "Rectum/back passage",
-  ],
-  onset: ["Sudden — came on quickly", "Gradual — built up slowly"],
-  cycle_link: [
-    "In the days before my period",
-    "During my period",
-    "In the days after my period",
-    "Around ovulation (mid-cycle)",
-    "No link to my cycle",
-    "I'm not sure",
-  ],
-  character: ["Cramping", "Sharp", "Stabbing", "Burning", "Dull ache", "Throbbing"],
-  associated: [
-    "Nausea",
-    "Bloating",
-    "Fatigue",
-    "Dizziness",
-    "Pain when passing a bowel motion",
-    "Pain when passing urine",
-    "Heavy bleeding",
-  ],
-  radiation: [
-    "Lower back",
-    "Down the legs",
-    "Towards the rectum/back passage",
-    "Towards the vagina",
-    "Doesn't spread anywhere else",
-  ],
-  duration: ["Minutes", "Hours", "Days", "Constant, doesn't go away"],
-  pattern: ["It's constant", "It comes and goes"],
-  worse: ["Moving around", "Sex", "Bowel movements", "Passing urine", "Exercise"],
-  better: ["Rest", "Heat (e.g. hot water bottle)", "Painkillers (NSAIDs, e.g. ibuprofen)", "Hormonal contraception"],
-  nsaid_relief: ["Haven't tried NSAIDs", "No relief at all", "Some relief, but pain continues", "Fully relieved"],
-} as const;
-
-function formatSocrates(a: SocratesAnswers): string {
-  const lines: string[] = [];
-  const push = (label: string, value: string | string[]) => {
-    const v = Array.isArray(value) ? value.join(", ") : value;
-    if (v && v.trim()) lines.push(`- ${label}: ${v}`);
-  };
-  const siteAll = [...a.site, ...(a.site_other.trim() ? [a.site_other.trim()] : [])];
-  push("Site", siteAll);
-  push("Onset", a.onset);
-  push("Cycle link", a.cycle_link);
-  push("Character", a.character);
-  push("Associated symptoms", a.associated);
-  push("Radiation", a.radiation);
-  push("Duration", a.duration);
-  push("Pattern", a.pattern);
-  push("Worse with", a.worse);
-  push("Better with", a.better);
-  push("NSAID response", a.nsaid_relief);
-  return lines.length ? `SOCRATES:\n${lines.join("\n")}` : "";
-}
-
-function SocratesFields({
-  answers,
-  onChange,
-  onShowBanner,
-}: {
-  answers: SocratesAnswers;
-  onChange: (patch: Partial<SocratesAnswers>) => void;
-  onShowBanner?: (b: BannerContent) => void;
-}) {
-  const toggle = (key: keyof SocratesAnswers, value: string) => {
-    const arr = answers[key] as string[];
-    const isChecking = !arr.includes(value);
-    const next = isChecking ? [...arr, value] : arr.filter((v) => v !== value);
-    onChange({ [key]: next } as Partial<SocratesAnswers>);
-    if (isChecking && onShowBanner) {
-      const content = CHECKBOX_BANNERS[value];
-      if (content) onShowBanner(content);
-    }
-  };
-  const set = (key: keyof SocratesAnswers, value: string) => {
-    // toggle-off if same option clicked again
-    const current = answers[key] as string;
-    const isSelecting = current !== value && value !== "";
-    onChange({ [key]: current === value ? "" : value } as Partial<SocratesAnswers>);
-    if (isSelecting && onShowBanner) {
-      const content = CHECKBOX_BANNERS[value];
-      if (content) onShowBanner(content);
-    }
-  };
-
-  return (
-    <div className="space-y-6 rounded-2xl border border-border/60 bg-muted/30 p-5">
-      <div>
-        <h3 className="font-serif text-xl leading-none tracking-tight">Log a symptom</h3>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Answer as best you can — you can skip anything that doesn't apply.
-        </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => del(r.id)}
+                      className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs"
+                      style={{ borderColor: C.border, color: C.muted, background: "#fff" }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => api.downloadReport(r.id)}
+                      disabled={r.status !== "complete"}
+                      className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs disabled:opacity-50"
+                      style={{ borderColor: C.border, color: C.text, background: "#fff" }}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      PDF
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
-
-      <SocratesGroup title="Site — where is the pain?">
-        {SOCRATES_SECTIONS.site.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.site.includes(opt)}
-            onClick={() => toggle("site", opt)}
-          />
-        ))}
-        <div className="pt-2">
-          <Label className="text-[11px] font-medium uppercase tracking-wide text-warm-grey">
-            Other site (optional)
-          </Label>
-          <Input
-            className="mt-1.5 rounded-full bg-background"
-            value={answers.site_other}
-            onChange={(e) => onChange({ site_other: e.target.value })}
-            placeholder="e.g. shoulder tip pain"
-          />
-        </div>
-      </SocratesGroup>
-
-      <SocratesGroup title="Onset — how did it start?">
-        {SOCRATES_SECTIONS.onset.map((opt) => (
-          <PillOption
-            key={opt}
-            type="radio"
-            label={opt}
-            selected={answers.onset === opt}
-            onClick={() => set("onset", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Onset — link to your cycle?">
-        {SOCRATES_SECTIONS.cycle_link.map((opt) => (
-          <PillOption
-            key={opt}
-            type="radio"
-            label={opt}
-            selected={answers.cycle_link === opt}
-            onClick={() => set("cycle_link", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Character — what does it feel like?">
-        {SOCRATES_SECTIONS.character.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.character.includes(opt)}
-            onClick={() => toggle("character", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Anything else alongside the pain?">
-        {SOCRATES_SECTIONS.associated.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.associated.includes(opt)}
-            onClick={() => toggle("associated", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Radiation — where does it spread to?">
-        {SOCRATES_SECTIONS.radiation.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.radiation.includes(opt)}
-            onClick={() => toggle("radiation", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Timing — how long does it last?">
-        {SOCRATES_SECTIONS.duration.map((opt) => (
-          <PillOption
-            key={opt}
-            type="radio"
-            label={opt}
-            selected={answers.duration === opt}
-            onClick={() => set("duration", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="Timing — pattern">
-        {SOCRATES_SECTIONS.pattern.map((opt) => (
-          <PillOption
-            key={opt}
-            type="radio"
-            label={opt}
-            selected={answers.pattern === opt}
-            onClick={() => set("pattern", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="What makes it worse?">
-        {SOCRATES_SECTIONS.worse.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.worse.includes(opt)}
-            onClick={() => toggle("worse", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="What makes it better?">
-        {SOCRATES_SECTIONS.better.map((opt) => (
-          <PillOption
-            key={opt}
-            type="check"
-            label={opt}
-            selected={answers.better.includes(opt)}
-            onClick={() => toggle("better", opt)}
-          />
-        ))}
-      </SocratesGroup>
-
-      <SocratesGroup title="If you've taken NSAIDs (e.g. ibuprofen), did they help?">
-        {SOCRATES_SECTIONS.nsaid_relief.map((opt) => (
-          <PillOption
-            key={opt}
-            type="radio"
-            label={opt}
-            selected={answers.nsaid_relief === opt}
-            onClick={() => set("nsaid_relief", opt)}
-          />
-        ))}
-      </SocratesGroup>
-    </div>
+    </SoftCard>
   );
 }
 
-function SocratesGroup({ title, children }: { title: string; children: React.ReactNode }) {
+// ---------------- Shared UI ----------------
+
+function SoftCard({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-charcoal">{title}</h4>
-      <div className="mt-2.5 space-y-2">{children}</div>
+    <div
+      id={id}
+      className="rounded-3xl border p-5 sm:p-6"
+      style={{ background: C.card, borderColor: C.border }}
+    >
+      {children}
     </div>
   );
 }
 
-function PillOption({
-  type,
-  label,
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+      style={{ color: C.muted }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Chip({
+  children,
   selected,
   onClick,
+  size = "md",
 }: {
-  type: "check" | "radio";
-  label: string;
+  children: React.ReactNode;
   selected: boolean;
   onClick: () => void;
+  size?: "md" | "sm";
 }) {
   return (
     <button
       type="button"
-      role={type === "radio" ? "radio" : "checkbox"}
-      aria-checked={selected}
+      aria-pressed={selected}
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-full border px-4 py-2.5 text-left text-sm transition ${
-        selected
-          ? "border-primary bg-pink/30 text-charcoal"
-          : "border-border/60 bg-background text-charcoal hover:border-primary/40"
-      }`}
+      className={`rounded-full border transition ${size === "sm" ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm"}`}
+      style={{
+        borderColor: selected ? C.deep : C.border,
+        background: selected ? C.light : "#fff",
+        color: selected ? C.deep : C.text,
+        fontWeight: selected ? 600 : 500,
+      }}
     >
-      <span
-        aria-hidden="true"
-        className={`grid h-5 w-5 shrink-0 place-items-center ${
-          type === "radio" ? "rounded-full" : "rounded"
-        } border ${selected ? "border-primary bg-background" : "border-warm-grey/60 bg-background"}`}
-      >
-        {selected &&
-          (type === "radio" ? (
-            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-          ) : (
-            <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-          ))}
-      </span>
-      <span>{label}</span>
+      {children}
     </button>
+  );
+}
+
+function NestedCard({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl p-3 ${className ?? ""}`}
+      style={{ background: C.bg, border: `1px solid ${C.border}` }}
+    >
+      <div className="text-xs font-semibold" style={{ color: C.text }}>
+        {title}
+      </div>
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+function PrimaryButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-full px-6"
+      style={{ background: C.accent, color: "#fff" }}
+    >
+      {children}
+    </Button>
+  );
+}
+function GhostButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full px-5 py-2 text-sm"
+      style={{ color: C.muted, background: "transparent" }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <SectionLabel>{label}</SectionLabel>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 rounded-full"
+        style={{ background: "#fff", borderColor: C.border, color: C.text }}
+      />
+    </div>
+  );
+}
+
+function SeverityPill({ severity }: { severity: ScoreBreakdown["severity"] }) {
+  return (
+    <span
+      className="mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{ background: severityColor(severity), color: C.text }}
+    >
+      {severity}
+    </span>
+  );
+}
+
+function Flower({
+  severity,
+  size = 48,
+  outlined = false,
+}: {
+  severity: ScoreBreakdown["severity"];
+  size?: number;
+  outlined?: boolean;
+}) {
+  const fill = severityColor(severity);
+  const stroke = outlined ? C.deep : "transparent";
+  const petals = [0, 60, 120, 180, 240, 300];
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      {petals.map((r) => (
+        <ellipse
+          key={r}
+          cx="50"
+          cy="28"
+          rx="12"
+          ry="18"
+          fill={outlined ? "#fff" : fill}
+          stroke={outlined ? stroke : "none"}
+          strokeWidth={outlined ? 2 : 0}
+          transform={`rotate(${r} 50 50)`}
+        />
+      ))}
+      <circle cx="50" cy="50" r="10" fill={outlined ? "#fff" : C.deep} stroke={outlined ? stroke : "none"} strokeWidth={outlined ? 2 : 0} />
+    </svg>
   );
 }
