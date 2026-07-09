@@ -1121,7 +1121,7 @@ function LegendItem({ icon, children }: { icon: React.ReactNode; children: React
 
 type TrendRange = "week" | "month" | "year";
 
-function PainTrendCard({ logs }: { logs: DailyLog[] }) {
+export function PainTrendCard({ logs }: { logs: DailyLog[] }) {
   const [range, setRange] = useState<TrendRange>("week");
   const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
   const points = useMemo(() => buildTrendPoints(logs, range, flare.ids), [logs, range, flare.ids]);
@@ -1346,8 +1346,8 @@ function LineChart({ points }: { points: TrendPoint[] }) {
                 cx={xFor(i)}
                 cy={yFor(p.value)}
                 r={p.flare ? 6 : 4}
-                fill={p.flare ? C.accent : "#fff"}
-                stroke={C.deep}
+                fill={p.flare ? C.red : "#fff"}
+                stroke={p.flare ? C.red : C.deep}
                 strokeWidth={p.flare ? 3 : 1.5}
               />
             </g>
@@ -1384,7 +1384,7 @@ function LineChart({ points }: { points: TrendPoint[] }) {
         <span className="inline-flex items-center gap-1.5">
           <span
             className="inline-block h-3 w-3 rounded-full border-[2px]"
-            style={{ borderColor: C.deep, background: C.accent }}
+            style={{ borderColor: C.red, background: C.red }}
           />
           Flare episode
         </span>
