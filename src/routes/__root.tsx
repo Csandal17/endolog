@@ -81,9 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "EndoHer is the AI health advocate for endometriosis. Log symptoms in your own words; EndoHer maps them to clinical terms so patterns are harder to dismiss." },
       { name: "author", content: "EndoHer" },
       { property: "og:title", content: "EndoHer — See what time reveals" },
-      { property: "og:description", content: "The AI health advocate for endometriosis. Describe what you've been experiencing; bring a clear record to every appointment." },
+      { property: "og:description", content: "EndoHer is the AI health advocate for endometriosis. Log symptoms in your own words; EndoHer maps them to clinical terms so patterns are harder to dismiss." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "EndoHer — See what time reveals" },
+      { name: "twitter:description", content: "EndoHer is the AI health advocate for endometriosis. Log symptoms in your own words; EndoHer maps them to clinical terms so patterns are harder to dismiss." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/10c7ff02-3d6c-498d-b7aa-428a23ba88fb/id-preview-1999b991--81992c30-47f4-4ad5-95e0-5691dd4f9de5.lovable.app-1783601724505.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/10c7ff02-3d6c-498d-b7aa-428a23ba88fb/id-preview-1999b991--81992c30-47f4-4ad5-95e0-5691dd4f9de5.lovable.app-1783601724505.png" },
     ],
     links: [
       {
