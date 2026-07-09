@@ -38,10 +38,10 @@ const C = {
   text: "#141210",     // charcoal
   muted: "#646059",    // warm grey
   border: "#E8DFD1",
-  accent: "#F5B8DB",   // soft pink (primary)
+  accent: "#D098E4",   // soft pink (primary)
   deep: "#141210",     // charcoal for text on accent
   light: "#FBE9B8",    // soft butter for highlights
-  pink: "#F5B8DB",
+  pink: "#D098E4",
   green: "#9AAB63",    // sage green (bolder for severity dot)
   greenSoft: "#D6E1B4",// sage tint (for backgrounds/chips)
   blue: "#B6CAEB",     // powder blue

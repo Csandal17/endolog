@@ -113,7 +113,7 @@ function SummaryPage() {
                 to="/doctor-report"
                 search={{ range }}
                 className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
-                style={{ background: "#F5B8DB", color: "#141210" }}
+                style={{ background: "#D098E4", color: "#141210" }}
               >
                 <FileText className="h-4 w-4" />
                 Generate report for doctor
