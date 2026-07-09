@@ -241,7 +241,7 @@ function Statistics() {
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">Why EndoHer exists</p>
           <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-charcoal sm:text-4xl">
-            Endometriosis is hard to name — and easy to dismiss.
+            Endometriosis is hard to name, and easy to dismiss.
           </h2>
         </div>
 
@@ -360,7 +360,7 @@ function QuietPromise() {
   const promises = [
     "EndoHer never draws conclusions.",
     "EndoHer never replaces your clinician.",
-    "Your words are yours — export or delete, always.",
+    "Your words are yours, export or delete, always.",
     "Log in the language your body speaks.",
   ];
   return (
@@ -372,7 +372,7 @@ function QuietPromise() {
             A record, never a diagnosis.
           </h2>
           <p className="mt-4 max-w-lg text-warm-grey">
-            EndoHer maps your words to clinical terms a doctor recognises — never replacing them,
+            EndoHer maps your words to clinical terms a doctor recognises, never replacing them,
             never drawing conclusions. The clinician interprets. EndoHer helps you be heard.
           </p>
         </div>
@@ -404,7 +404,7 @@ function Testimonial() {
       <Quote className="mx-auto h-8 w-8 text-primary" />
       <blockquote className="mt-6 font-serif text-3xl leading-tight tracking-tight text-charcoal sm:text-4xl">
         “For the first time I walked into an appointment with the words for what I'd been
-        living with. My GP paused, read the page, and said — okay. Let's look at this
+        living with. My GP paused, read the page, and said, okay. Let's look at this
         properly.”
       </blockquote>
       <div className="mt-6 text-sm text-warm-grey">
