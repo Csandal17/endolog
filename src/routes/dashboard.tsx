@@ -2002,7 +2002,7 @@ export function ReportPreviewCard({
           {stats.trend.thisCount} of the last 7 days were logged this week
           {stats.trend.prevCount > 0 ? `, and ${stats.trend.prevCount} the week before` : ""}.
           {stats.trend.thisAvg != null && stats.trend.prevAvg != null && stats.trend.delta != null && (
-            <> Average burden score is trending {stats.trend.delta > 0 ? "upward" : stats.trend.delta < 0 ? "downward" : "flat"} week-on-week — <strong>{stats.trend.thisAvg}</strong> this week vs <strong>{stats.trend.prevAvg}</strong> the week before.</>
+            <> Average score is trending {stats.trend.delta > 0 ? "upward" : stats.trend.delta < 0 ? "downward" : "flat"} week-on-week — <strong>{stats.trend.thisAvg}</strong> this week vs <strong>{stats.trend.prevAvg}</strong> the week before.</>
           )}
           {stats.trend.thisAvg == null && " Not enough data this week to compute a weekly average."}
         </p>
