@@ -93,7 +93,7 @@ type DailyLog = {
 
 const LOGS_KEY = "maai:daily-logs:v1";
 
-function readLogs(): DailyLog[] {
+export function readLogs(): DailyLog[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(LOGS_KEY);
@@ -374,7 +374,7 @@ function Dashboard() {
   );
 }
 
-function TopBar() {
+export function TopBar({ current }: { current?: "daily" | "summary" } = {}) {
   return (
     <header
       className="sticky top-0 z-30 border-b backdrop-blur"
@@ -393,10 +393,16 @@ function TopBar() {
           </span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link to="/dashboard" className="font-semibold" style={{ color: C.text }}>
+          <Link
+            to="/dashboard"
+            style={{ color: current === "daily" ? C.text : C.muted, fontWeight: current === "daily" ? 600 : 400 }}
+          >
             Daily log
           </Link>
-          <Link to="/summary" style={{ color: C.muted }}>
+          <Link
+            to="/summary"
+            style={{ color: current === "summary" ? C.text : C.muted, fontWeight: current === "summary" ? 600 : 400 }}
+          >
             Summary
           </Link>
           <Link to="/" className="inline-flex items-center gap-1" style={{ color: C.muted }}>
