@@ -598,6 +598,8 @@ function Dashboard() {
                         socrates: { ...emptySocrates },
                       })
                     }
+                    banner={banner}
+                    onShowBanner={(b) => setBanner({ key: `${Date.now()}`, ...b })}
                   />
                 </motion.div>
               ) : (
