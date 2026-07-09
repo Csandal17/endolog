@@ -2138,7 +2138,7 @@ function Flower({
           rx="12"
           ry="18"
           fill={fill}
-          stroke={outlined ? C.deep : "none"}
+          stroke={outlined ? C.red : "none"}
           strokeWidth={outlined ? 3.5 : 0}
           strokeLinejoin="round"
           transform={`rotate(${r} 50 50)`}
@@ -2148,8 +2148,8 @@ function Flower({
         cx="50"
         cy="50"
         r="10"
-        fill={C.deep}
-        stroke={outlined ? C.deep : "none"}
+        fill={outlined ? C.red : C.deep}
+        stroke={outlined ? C.red : "none"}
         strokeWidth={outlined ? 3.5 : 0}
       />
     </svg>
