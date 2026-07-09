@@ -367,10 +367,6 @@ function Dashboard() {
           <WeeklyLog logs={logs} onDelete={deleteLog} onClear={clearLogs} />
         </section>
 
-        <section className="mb-8">
-          <PainTrendCard logs={logs} />
-        </section>
-
         <DailyLogSection onSave={saveLog} onGeneratedReport={() => setHistoryRefresh((k) => k + 1)} logs={logs} />
 
         <footer className="mt-12 pb-6 text-center text-xs" style={{ color: C.muted }}>
