@@ -750,7 +750,7 @@ function IntakeCard({
         />
 
         <AnimatePresence>
-          {banner && (
+          {banner?.stat && (
             <ReassuranceBanner
               key={banner.key}
               stat={banner.stat}
