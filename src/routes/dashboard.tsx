@@ -835,6 +835,15 @@ function PainNrsField({
   onShowBanner?: (b: BannerContent) => void;
 }) {
   const initialScoreRef = useRef(score);
+  const prevScoreRef = useRef(score);
+  useEffect(() => {
+    if (score !== prevScoreRef.current) {
+      prevScoreRef.current = score;
+      if (score !== initialScoreRef.current && onShowBanner) {
+        onShowBanner(getPainBanner(score));
+      }
+    }
+  }, [score, onShowBanner]);
   const swatch = painColor(score);
   const pct = (score / 10) * 100;
   const label =
