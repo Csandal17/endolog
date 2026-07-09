@@ -1,6 +1,6 @@
 // Server-only Supabase client for the mock backend routes. Uses the
-// service role key to bypass RLS since this demo endpoint is unauthenticated
-// and the patients/reports tables now enforce per-user RLS policies.
+// publishable backend key so demo API routes run through the same RLS rules
+// as public app requests instead of depending on privileged credentials.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let _client: SupabaseClient | undefined;
@@ -8,10 +8,10 @@ let _client: SupabaseClient | undefined;
 export function getServerSupabase(): SupabaseClient {
   if (_client) return _client;
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) {
     throw new Error(
-      "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — Lovable Cloud not connected on the server.",
+      "Missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY — Lovable Cloud not connected on the server.",
     );
   }
   _client = createClient(url, key, {
