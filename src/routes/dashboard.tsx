@@ -1172,7 +1172,7 @@ export function PainTrendCard({ logs }: { logs: DailyLog[] }) {
             className="mt-1 text-2xl"
             style={{ fontFamily: "Fraunces, serif", color: C.text }}
           >
-            Pain over time
+            Symptom burden
           </h2>
         </div>
         <div
