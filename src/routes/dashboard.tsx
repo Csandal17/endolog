@@ -47,7 +47,33 @@ const C = {
   blue: "#B6CAEB",     // powder blue
   red: "#B8443A",      // deep warm red for severe / flare
   redSoft: "#F4D7D2",  // red tint for backgrounds
+  moderate: "#D9A441", // amber/gold for moderate severity
+  flareBand: "#FBE9B8",// soft butter band behind confirmed flare episodes
 };
+
+// Interpolate the pain-score chip from soft yellow (0) → deep red (10).
+function painChipColors(pain: number): { bg: string; fg: string } {
+  const t = Math.max(0, Math.min(10, pain)) / 10;
+  // yellow #F5C542 → red #B8443A
+  const from = { r: 0xf5, g: 0xc5, b: 0x42 };
+  const to = { r: 0xb8, g: 0x44, b: 0x3a };
+  const r = Math.round(from.r + (to.r - from.r) * t);
+  const g = Math.round(from.g + (to.g - from.g) * t);
+  const b = Math.round(from.b + (to.b - from.b) * t);
+  const bg = `rgb(${r}, ${g}, ${b})`;
+  // Switch to white text once the chip gets dark enough for contrast.
+  const fg = t > 0.5 ? "#FFFFFF" : "#141210";
+  return { bg, fg };
+}
+
+// Map an average pain value (0–10) to the same severity buckets shown in
+// the weekly log legend (Mild / Moderate / Severe).
+function painSeverityColor(pain: number): string {
+  if (pain <= 0) return "#CFC7BA"; // unlogged / no pain
+  if (pain < 4) return C.green;
+  if (pain < 7) return C.moderate;
+  return C.red;
+}
 
 // ---------------- Data model ----------------
 
@@ -632,12 +658,18 @@ function Step1({
             <span>Worst imaginable</span>
           </div>
         </div>
-        <div
-          className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl"
-          style={{ background: C.light, color: C.deep, fontFamily: "Fraunces, serif" }}
-        >
-          <span className="text-4xl">{pain}</span>
-        </div>
+        {(() => {
+          const { bg, fg } = painChipColors(pain);
+          return (
+            <div
+              className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl transition-colors duration-300"
+              style={{ background: bg, color: fg, fontFamily: "Fraunces, serif" }}
+              aria-label={`Pain rating ${pain} out of 10`}
+            >
+              <span className="text-4xl">{pain}</span>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="mt-8 flex justify-end">
@@ -1140,7 +1172,7 @@ export function PainTrendCard({ logs }: { logs: DailyLog[] }) {
             className="mt-1 text-2xl"
             style={{ fontFamily: "Fraunces, serif", color: C.text }}
           >
-            Pain over time
+            Symptom burden
           </h2>
         </div>
         <div
@@ -1292,14 +1324,48 @@ function LineChart({ points }: { points: TrendPoint[] }) {
   });
   if (current.length) segments.push(current.join(" "));
 
+  // Build contiguous flare bands (consecutive indices with flare=true).
+  const bands: { start: number; end: number }[] = [];
+  {
+    let s: number | null = null;
+    points.forEach((p, i) => {
+      if (p.flare) {
+        if (s == null) s = i;
+      } else if (s != null) {
+        bands.push({ start: s, end: i - 1 });
+        s = null;
+      }
+    });
+    if (s != null) bands.push({ start: s, end: points.length - 1 });
+  }
+
   return (
     <div className="w-full overflow-x-auto">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full min-w-[520px]"
         role="img"
-        aria-label="Pain over time"
+        aria-label="Symptom burden over time"
       >
+        {/* flare episode bands */}
+        {bands.map((b, i) => {
+          const half = stepX / 2 || 12;
+          const x = xFor(b.start) - half;
+          const w = xFor(b.end) - xFor(b.start) + half * 2;
+          return (
+            <rect
+              key={`band-${i}`}
+              x={Math.max(padL, x)}
+              y={padT}
+              width={Math.min(W - padR - Math.max(padL, x), w)}
+              height={innerH}
+              fill={C.flareBand}
+              opacity={0.7}
+              rx={6}
+            />
+          );
+        })}
+
         {/* y-axis gridlines: 0, 2, 4, 6, 8, 10 */}
         {[0, 2, 4, 6, 8, 10].map((v) => (
           <g key={v}>
@@ -1345,10 +1411,10 @@ function LineChart({ points }: { points: TrendPoint[] }) {
               <circle
                 cx={xFor(i)}
                 cy={yFor(p.value)}
-                r={p.flare ? 6 : 4}
-                fill={p.flare ? C.red : "#fff"}
-                stroke={p.flare ? C.red : C.deep}
-                strokeWidth={p.flare ? 3 : 1.5}
+                r={p.flare ? 6 : 4.5}
+                fill={painSeverityColor(p.value)}
+                stroke={p.flare ? C.deep : "#FFFFFF"}
+                strokeWidth={p.flare ? 2 : 1.5}
               />
             </g>
           ),
@@ -1375,17 +1441,19 @@ function LineChart({ points }: { points: TrendPoint[] }) {
         style={{ color: C.muted }}
       >
         <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full border"
-            style={{ borderColor: C.deep, background: "#fff" }}
-          />
-          Average pain (0–10)
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.green }} />
+          Mild
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-3 w-3 rounded-full border-[2px]"
-            style={{ borderColor: C.red, background: C.red }}
-          />
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.moderate }} />
+          Moderate
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.red }} />
+          Severe
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-4 rounded-sm" style={{ background: C.flareBand }} />
           Flare episode
         </span>
       </div>
