@@ -742,7 +742,22 @@ function IntakeCard({
           onNow={onPainDateTimeNow}
         />
 
-        <SocratesFields answers={form.socrates} onChange={setSocrates} />
+        <SocratesFields
+          answers={form.socrates}
+          onChange={setSocrates}
+          onShowBanner={onShowBanner}
+        />
+
+        <AnimatePresence>
+          {banner && (
+            <ReassuranceBanner
+              key={banner.key}
+              stat={banner.stat}
+              message={banner.message}
+              onDismiss={() => onShowBanner({ stat: "", message: "" })}
+            />
+          )}
+        </AnimatePresence>
 
         <Field
           label="What have you been experiencing?"
