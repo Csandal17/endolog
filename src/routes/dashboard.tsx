@@ -340,6 +340,13 @@ function Dashboard() {
           <ReportHistoryCard refreshKey={historyRefreshKey} />
         </section>
       </main>
+
+      <footer className="border-t border-border/40 bg-background">
+        <div className="mx-auto max-w-6xl px-6 py-8 text-center text-sm text-muted-foreground">
+          <p>Maai does not diagnose. Always consult a clinician.</p>
+          <p className="mt-1">© 2026 Maai. Made with care.</p>
+        </div>
+      </footer>
     </div>
   );
 }
