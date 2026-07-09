@@ -564,12 +564,13 @@ export function TopBar({ current }: { current?: "daily" | "summary" } = {}) {
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <div
-            className="grid h-9 w-9 place-items-center rounded-2xl text-sm"
-            style={{ background: C.accent, color: "#fff", fontFamily: "Fraunces, serif" }}
-          >
-            M
-          </div>
+          <img
+            src="/favicon.png"
+            alt="EndoHer logo"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-2xl"
+          />
           <span style={{ fontFamily: "Fraunces, serif" }} className="text-lg tracking-tight">
             EndoHer
           </span>
