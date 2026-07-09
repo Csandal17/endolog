@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SummaryRouteImport } from './routes/summary'
 import { Route as DoctorReportRouteImport } from './routes/doctor-report'
+import { Route as DiagnosisProfileRouteImport } from './routes/diagnosis-profile'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as IndexRouteImport } from './routes/index'
@@ -27,6 +28,11 @@ const SummaryRoute = SummaryRouteImport.update({
 const DoctorReportRoute = DoctorReportRouteImport.update({
   id: '/doctor-report',
   path: '/doctor-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiagnosisProfileRoute = DiagnosisProfileRouteImport.update({
+  id: '/diagnosis-profile',
+  path: '/diagnosis-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/diagnosis-profile': typeof DiagnosisProfileRoute
   '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/diagnosis-profile': typeof DiagnosisProfileRoute
   '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/diagnosis-profile': typeof DiagnosisProfileRoute
   '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/diagnosis-profile'
     | '/doctor-report'
     | '/summary'
     | '/api/process'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/diagnosis-profile'
     | '/doctor-report'
     | '/summary'
     | '/api/process'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/diagnosis-profile'
     | '/doctor-report'
     | '/summary'
     | '/api/process'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CheckInRoute: typeof CheckInRoute
   DashboardRoute: typeof DashboardRoute
+  DiagnosisProfileRoute: typeof DiagnosisProfileRoute
   DoctorReportRoute: typeof DoctorReportRoute
   SummaryRoute: typeof SummaryRoute
   ApiProcessRoute: typeof ApiProcessRoute
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/doctor-report'
       fullPath: '/doctor-report'
       preLoaderRoute: typeof DoctorReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/diagnosis-profile': {
+      id: '/diagnosis-profile'
+      path: '/diagnosis-profile'
+      fullPath: '/diagnosis-profile'
+      preLoaderRoute: typeof DiagnosisProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -230,6 +250,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CheckInRoute: CheckInRoute,
   DashboardRoute: DashboardRoute,
+  DiagnosisProfileRoute: DiagnosisProfileRoute,
   DoctorReportRoute: DoctorReportRoute,
   SummaryRoute: SummaryRoute,
   ApiProcessRoute: ApiProcessRoute,
