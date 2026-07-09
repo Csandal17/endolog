@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SummaryRouteImport } from './routes/summary'
+import { Route as DoctorReportRouteImport } from './routes/doctor-report'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,6 +22,11 @@ import { Route as ApiReportsIdPdfRouteImport } from './routes/api/reports/$id/pd
 const SummaryRoute = SummaryRouteImport.update({
   id: '/summary',
   path: '/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DoctorReportRoute = DoctorReportRouteImport.update({
+  id: '/doctor-report',
+  path: '/doctor-report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
+  '/doctor-report': typeof DoctorReportRoute
   '/summary': typeof SummaryRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/doctor-report'
     | '/summary'
     | '/api/process'
     | '/api/reports/$id'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/doctor-report'
     | '/summary'
     | '/api/process'
     | '/api/reports/$id'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/check-in'
     | '/dashboard'
+    | '/doctor-report'
     | '/summary'
     | '/api/process'
     | '/api/reports/$id'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CheckInRoute: typeof CheckInRoute
   DashboardRoute: typeof DashboardRoute
+  DoctorReportRoute: typeof DoctorReportRoute
   SummaryRoute: typeof SummaryRoute
   ApiProcessRoute: typeof ApiProcessRoute
   ApiReportsIdRoute: typeof ApiReportsIdRouteWithChildren
@@ -140,6 +153,13 @@ declare module '@tanstack/react-router' {
       path: '/summary'
       fullPath: '/summary'
       preLoaderRoute: typeof SummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/doctor-report': {
+      id: '/doctor-report'
+      path: '/doctor-report'
+      fullPath: '/doctor-report'
+      preLoaderRoute: typeof DoctorReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -210,6 +230,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CheckInRoute: CheckInRoute,
   DashboardRoute: DashboardRoute,
+  DoctorReportRoute: DoctorReportRoute,
   SummaryRoute: SummaryRoute,
   ApiProcessRoute: ApiProcessRoute,
   ApiReportsIdRoute: ApiReportsIdRouteWithChildren,
