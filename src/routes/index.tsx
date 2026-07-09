@@ -28,6 +28,7 @@ function Index() {
       <QuietPromise />
       <Testimonial />
       <CTA />
+      <BrandMark />
       <Footer />
     </div>
   );
