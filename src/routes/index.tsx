@@ -55,7 +55,7 @@ function Nav() {
         </nav>
         <div className="flex items-center gap-2">
           <Button variant="ghost" className="hidden sm:inline-flex" asChild>
-            <Link to="/dashboard">Sign in</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
           <Button className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90" asChild>
             <Link to="/dashboard">
