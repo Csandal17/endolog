@@ -23,7 +23,7 @@ function SummaryPage() {
 
   return (
     <div
-      style={{ background: "#F5F3F7", color: "#2B2333" }}
+      style={{ background: "#F3EDE3", color: "#141210" }}
       className="min-h-screen font-[Karla,system-ui,sans-serif]"
     >
       <TopBar current="summary" />
@@ -31,7 +31,7 @@ function SummaryPage() {
         <header className="mb-8">
           <p
             className="text-xs font-semibold uppercase tracking-[0.22em]"
-            style={{ color: "#6E6579" }}
+            style={{ color: "#646059" }}
           >
             Summary
           </p>
@@ -41,7 +41,7 @@ function SummaryPage() {
           >
             Your report and history.
           </h1>
-          <p className="mt-2 text-sm" style={{ color: "#6E6579" }}>
+          <p className="mt-2 text-sm" style={{ color: "#646059" }}>
             A clinician-friendly preview built from your daily logs, plus every report you've generated.
           </p>
         </header>
