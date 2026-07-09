@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { readLogs, TopBar, PainTrendCard, ReportHistoryCard } from "./dashboard";
+import { supabase } from "@/integrations/supabase/client";
 
 type RangeKey = "7" | "30" | "90" | "all";
 const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
@@ -25,10 +26,38 @@ export const Route = createFileRoute("/summary")({
 function SummaryPage() {
   const [logs, setLogs] = useState<ReturnType<typeof readLogs>>([]);
   const [range, setRange] = useState<RangeKey>("30");
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setLogs(readLogs());
   }, []);
+
+  async function handleDeleteAll() {
+    setDeleting(true);
+    setMessage(null);
+    try {
+      try {
+        window.localStorage.removeItem("maai:daily-logs:v1");
+        window.localStorage.removeItem("maai:pathway");
+        window.localStorage.removeItem("diagnosisProfile");
+      } catch { /* ignore */ }
+
+      await supabase.from("reports").delete().is("user_id", null);
+      await supabase.from("patients").delete().is("user_id", null);
+
+      setLogs([]);
+      setRefreshKey((k) => k + 1);
+      setConfirming(false);
+      setMessage("All records have been deleted.");
+    } catch (e) {
+      setMessage("Something went wrong deleting your records. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div
@@ -123,7 +152,78 @@ function SummaryPage() {
         </section>
 
         <section className="mt-8">
-          <ReportHistoryCard refreshKey={0} />
+          <ReportHistoryCard refreshKey={refreshKey} />
+        </section>
+
+        <section className="mt-12">
+          <div
+            className="rounded-3xl border p-5 sm:p-6"
+            style={{ background: "#FFF5F5", borderColor: "#F1C4C4" }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl"
+                style={{ background: "#F8DADA" }}
+                aria-hidden
+              >
+                <Trash2 className="h-5 w-5" style={{ color: "#B0322C" }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2
+                  className="text-xl sm:text-2xl"
+                  style={{ fontFamily: "Fraunces, DM Serif Display, Georgia, serif", color: "#7A1F1A" }}
+                >
+                  Delete all records
+                </h2>
+                <p className="mt-1 text-sm" style={{ color: "#7A1F1A" }}>
+                  Permanently remove every daily log, diagnosis profile, generated report and
+                  patient entry stored for your account. This cannot be undone.
+                </p>
+
+                {message && (
+                  <p className="mt-3 text-sm" style={{ color: "#7A1F1A" }}>
+                    {message}
+                  </p>
+                )}
+
+                {!confirming ? (
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      onClick={() => { setMessage(null); setConfirming(true); }}
+                      className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition active:scale-[0.97]"
+                      style={{ background: "#B0322C" }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete all records
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleDeleteAll}
+                      disabled={deleting}
+                      className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-60"
+                      style={{ background: "#B0322C" }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleting ? "Deleting…" : "Yes, delete everything"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      disabled={deleting}
+                      className="rounded-full border px-5 py-2.5 text-sm font-semibold"
+                      style={{ borderColor: "#E8DFD1", background: "#FFFFFF", color: "#141210" }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>
