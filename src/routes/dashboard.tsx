@@ -369,9 +369,21 @@ function emptyLog(): DailyLog {
 function Dashboard() {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [pathway, setPathway] = useState<"suspected" | "diagnosed" | null>(null);
+  const [showPathway, setShowPathway] = useState(false);
 
   useEffect(() => {
     setLogs(readLogs());
+    try {
+      const stored = window.localStorage.getItem(PATHWAY_KEY) as
+        | "suspected"
+        | "diagnosed"
+        | null;
+      if (stored) setPathway(stored);
+      else setShowPathway(true);
+    } catch {
+      setShowPathway(true);
+    }
   }, []);
 
   function saveLog(entry: DailyLog) {
@@ -397,6 +409,32 @@ function Dashboard() {
     <div style={{ background: C.bg, color: C.text }} className="min-h-screen font-[Karla,system-ui,sans-serif]">
         <TopBar current="daily" />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+        {pathway && (
+          <div className="mb-4 flex items-center justify-between rounded-full border px-4 py-2 text-xs"
+               style={{ borderColor: C.border, background: "#fff", color: C.muted }}>
+            <span>
+              Pathway:{" "}
+              <span style={{ color: C.text, fontWeight: 600 }}>
+                {pathway === "diagnosed" ? "Diagnosed endometriosis" : "Suspected endometriosis"}
+              </span>
+            </span>
+            <div className="flex items-center gap-3">
+              {pathway === "diagnosed" && (
+                <Link to="/diagnosis-profile" className="underline" style={{ color: C.text }}>
+                  Edit diagnosis profile
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPathway(true)}
+                className="underline"
+                style={{ color: C.muted }}
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        )}
         <header className="mb-6 sm:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: C.muted }}>
             Daily log
@@ -423,6 +461,97 @@ function Dashboard() {
           <p className="mt-1">© 2026 Maai. Made with care.</p>
         </footer>
       </main>
+      {showPathway && (
+        <PathwayModal
+          onSuspected={() => {
+            try { window.localStorage.setItem(PATHWAY_KEY, "suspected"); } catch { /* ignore */ }
+            setPathway("suspected");
+            setShowPathway(false);
+          }}
+          onDiagnosed={() => {
+            try { window.localStorage.setItem(PATHWAY_KEY, "diagnosed"); } catch { /* ignore */ }
+            setPathway("diagnosed");
+            setShowPathway(false);
+          }}
+          onClose={pathway ? () => setShowPathway(false) : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+function PathwayModal({
+  onSuspected,
+  onDiagnosed,
+  onClose,
+}: {
+  onSuspected: () => void;
+  onDiagnosed: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center px-4"
+      style={{ background: "rgba(20,18,16,0.45)" }}
+      role="dialog"
+      aria-modal
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl border p-6 sm:p-8"
+        style={{ background: "#fff", borderColor: C.border }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: C.muted }}>
+          Before you start
+        </p>
+        <h2 className="mt-2 text-2xl" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
+          Where are you in your endometriosis journey?
+        </h2>
+        <p className="mt-2 text-sm" style={{ color: C.muted }}>
+          This helps Maai tailor what you see. You can change it any time.
+        </p>
+
+        <div className="mt-5 grid gap-3">
+          <button
+            type="button"
+            onClick={onSuspected}
+            className="rounded-2xl border p-4 text-left active:scale-[0.99] transition-transform"
+            style={{ borderColor: C.border, background: "#fff" }}
+          >
+            <p className="text-base font-semibold" style={{ color: C.text }}>
+              I suspect endometriosis
+            </p>
+            <p className="mt-1 text-sm" style={{ color: C.muted }}>
+              Go straight to daily logging in three quick steps.
+            </p>
+          </button>
+          <Link
+            to="/diagnosis-profile"
+            onClick={onDiagnosed}
+            className="rounded-2xl border p-4 text-left active:scale-[0.99] transition-transform"
+            style={{ borderColor: C.accent, background: C.pink + "22" }}
+          >
+            <p className="text-base font-semibold" style={{ color: C.text }}>
+              I'm diagnosed with endometriosis
+            </p>
+            <p className="mt-1 text-sm" style={{ color: C.muted }}>
+              Add your diagnosis details so tracking and doctor summaries are personalised.
+            </p>
+          </Link>
+        </div>
+
+        {onClose && (
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs underline"
+              style={{ color: C.muted }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
