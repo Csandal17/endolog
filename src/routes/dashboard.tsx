@@ -1139,8 +1139,204 @@ function WeeklyLog({
           </button>
         </div>
       )}
+
+      {openLog && (
+        <DaySummaryDialog
+          log={openLog}
+          isFlare={flare.ids.has(openLog.id)}
+          onClose={() => setOpenLog(null)}
+          onDelete={(id) => {
+            onDelete(id);
+            setOpenLog(null);
+          }}
+        />
+      )}
     </SoftCard>
   );
+}
+
+function DaySummaryDialog({
+  log,
+  isFlare,
+  onClose,
+  onDelete,
+}: {
+  log: DailyLog;
+  isFlare: boolean;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const score = calcScore({
+    pain: log.pain,
+    siteDescriptors: log.siteDescriptors,
+    wholeBody: log.wholeBody,
+    bleedingUnexpected: log.bleedingUnexpected,
+    impact: log.impactChosen ? log.impact : 0,
+  });
+  const dt = new Date(log.loggedAt);
+  const dateLabel = new Date(log.date).toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const rows: { k: string; v: React.ReactNode }[] = [];
+  const siteEntries = Object.entries(log.siteDescriptors);
+  if (siteEntries.length > 0) {
+    rows.push({
+      k: "Pain sites",
+      v: siteEntries
+        .map(([s, d]) => (d.length ? `${s} (${d.join(", ")})` : s))
+        .join("; "),
+    });
+  }
+  if (log.wholeBody.length) rows.push({ k: "Whole body", v: log.wholeBody.join(", ") });
+  if (log.bleedingUnexpected) rows.push({ k: "Bleeding", v: "Outside expected window" });
+  if (log.impactChosen) {
+    rows.push({
+      k: "Impact",
+      v:
+        log.impact === 0
+          ? "Didn't affect activities"
+          : log.impact === 15
+            ? "Affected some activities"
+            : "Affected most activities",
+    });
+  }
+  if (log.medicationName || log.medicationEffect) {
+    rows.push({
+      k: "Medication",
+      v: `${log.medicationName || "—"}${log.medicationEffect ? ` · ${log.medicationEffect}` : ""}`,
+    });
+  }
+  const detailEntries = Object.entries(log.detail).filter(([, v]) => v && v.trim());
+  for (const [k, v] of detailEntries) rows.push({ k: prettyDetailKey(k), v });
+  if (log.otherSymptoms) rows.push({ k: "Notes", v: log.otherSymptoms });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+      style={{ background: "rgba(20,18,16,0.45)" }}
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg overflow-hidden rounded-3xl border"
+        style={{ background: "#fff", borderColor: C.border }}
+      >
+        <div className="flex items-start justify-between gap-3 p-5" style={{ background: C.bg }}>
+          <div className="flex items-center gap-3">
+            <Flower severity={score.severity} size={44} outlined={isFlare} />
+            <div>
+              <div
+                className="text-lg leading-tight"
+                style={{ fontFamily: "Fraunces, DM Serif Display, Georgia, serif", color: C.text }}
+              >
+                {dateLabel}
+              </div>
+              <div className="mt-0.5 text-xs" style={{ color: C.muted }}>
+                Logged at{" "}
+                {dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ background: severityColor(score.severity), color: C.text }}
+                >
+                  {score.severity} · {score.total}
+                </span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ background: "#fff", color: C.text, border: `1px solid ${C.border}` }}
+                >
+                  Pain {log.pain}/10
+                </span>
+                {isFlare && (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                    style={{ background: C.deep, color: "#fff" }}
+                  >
+                    Flare episode
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full px-2 text-lg leading-none"
+            style={{ color: C.muted }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-5">
+          {rows.length === 0 ? (
+            <p className="text-sm italic" style={{ color: C.muted }}>
+              No additional details were recorded for this day.
+            </p>
+          ) : (
+            <dl className="divide-y" style={{ borderColor: C.border }}>
+              {rows.map((r, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-[110px_1fr] gap-3 py-2.5 text-sm"
+                  style={{ borderTop: i === 0 ? "none" : `1px solid ${C.border}`, color: C.text }}
+                >
+                  <dt
+                    className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                    style={{ color: C.muted }}
+                  >
+                    {r.k}
+                  </dt>
+                  <dd>{r.v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+
+        <div
+          className="flex items-center justify-between gap-3 border-t p-4"
+          style={{ borderColor: C.border, background: "#fff" }}
+        >
+          <button
+            type="button"
+            onClick={() => onDelete(log.id)}
+            className="inline-flex items-center gap-1.5 text-xs"
+            style={{ color: C.muted }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete entry
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full px-5 py-2 text-sm font-semibold"
+            style={{ background: C.accent, color: C.deep }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function prettyDetailKey(k: string): string {
+  switch (k) {
+    case "worse": return "Made it worse";
+    case "better": return "Made it better";
+    case "timing": return "Timing";
+    case "pattern": return "Pattern";
+    case "cycleLink": return "Cycle link";
+    default: return k;
+  }
 }
 
 function LegendItem({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
