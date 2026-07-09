@@ -1846,7 +1846,6 @@ function Flower({
   outlined?: boolean;
 }) {
   const fill = severityColor(severity);
-  const stroke = outlined ? C.deep : "transparent";
   const petals = [0, 60, 120, 180, 240, 300];
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
@@ -1857,13 +1856,21 @@ function Flower({
           cy="28"
           rx="12"
           ry="18"
-          fill={outlined ? "#fff" : fill}
-          stroke={outlined ? stroke : "none"}
-          strokeWidth={outlined ? 2 : 0}
+          fill={fill}
+          stroke={outlined ? C.deep : "none"}
+          strokeWidth={outlined ? 3.5 : 0}
+          strokeLinejoin="round"
           transform={`rotate(${r} 50 50)`}
         />
       ))}
-      <circle cx="50" cy="50" r="10" fill={outlined ? "#fff" : C.deep} stroke={outlined ? stroke : "none"} strokeWidth={outlined ? 2 : 0} />
+      <circle
+        cx="50"
+        cy="50"
+        r="10"
+        fill={C.deep}
+        stroke={outlined ? C.deep : "none"}
+        strokeWidth={outlined ? 3.5 : 0}
+      />
     </svg>
   );
 }
