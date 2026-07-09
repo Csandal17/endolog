@@ -2082,6 +2082,37 @@ export function ReportPreviewCard({
         </div>
       </ReportSection>
 
+      {/* SOCRATES pain assessment */}
+      <ReportSection title="Symptoms & information (SOCRATES)" serif={serif}>
+        <p className="mb-3 text-xs italic" style={{ color: C.muted }}>
+          Site · Onset · Character · Radiation · Associations · Time course · Exacerbating & relieving · Severity
+        </p>
+        <dl className="divide-y" style={{ borderColor: C.border }}>
+          {buildSocrates(logs).map((row) => (
+            <div
+              key={row.label}
+              className="grid grid-cols-[140px_1fr] gap-4 py-3 text-sm"
+              style={{ borderTop: `1px solid ${C.border}`, color: C.text }}
+            >
+              <dt
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: C.muted }}
+              >
+                {row.label}
+              </dt>
+              <dd
+                style={{
+                  color: row.value === "Not described" ? C.muted : C.text,
+                  fontStyle: row.value === "Not described" ? "italic" : "normal",
+                }}
+              >
+                {row.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </ReportSection>
+
       {/* Symptom burden 30d chart */}
       <ReportSection title="Symptom burden — last 30 days" serif={serif}>
         <BurdenMiniChart points={stats.burdenPoints} threshold={stats.currentThreshold} />
