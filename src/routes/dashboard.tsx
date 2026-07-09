@@ -727,7 +727,7 @@ function PainTooltip({ value, pct, visible }: { value: number; pct: number; visi
           style={{
             left: `${pct}%`,
             bottom: 12,
-            transform: "translateX(-50%)",
+            transform: value <= 1 ? "translateX(0)" : "translateX(-50%)",
             maxWidth: 200,
             width: "max-content",
             opacity: visible ? 0.92 : 0,
@@ -2969,8 +2969,8 @@ function PrimaryButton({
     <Button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-full px-6"
-      style={{ background: C.accent, color: "#fff" }}
+      className="rounded-full px-6 active:scale-[0.97] active:brightness-95 transition-transform duration-150"
+      style={{ background: C.accent, color: "#000" }}
     >
       {children}
     </Button>
