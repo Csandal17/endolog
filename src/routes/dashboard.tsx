@@ -641,9 +641,11 @@ function PainNrsField({
 
         <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>0 · No pain</span>
-          <span aria-hidden="true" className="font-medium" style={{ color: swatch }}>
-            {label}
-          </span>
+          {score > 0 && (
+            <span aria-hidden="true" className="font-medium" style={{ color: swatch }}>
+              {label}
+            </span>
+          )}
           <span>10 · Worst ever</span>
         </div>
       </div>
