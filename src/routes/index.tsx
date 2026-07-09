@@ -38,7 +38,7 @@ function Wordmark({ className = "" }: { className?: string }) {
       <div className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
         <span className="font-serif text-base leading-none">M</span>
       </div>
-      <span className="font-serif text-2xl tracking-tight text-charcoal">Maai</span>
+      <span className="font-serif text-2xl tracking-tight text-charcoal">EndoHer</span>
     </Link>
   );
 }
@@ -50,7 +50,7 @@ function Nav() {
         <Wordmark />
         <nav className="hidden items-center gap-8 text-sm text-warm-grey md:flex">
           <a href="#how" className="hover:text-foreground">How it works</a>
-          <a href="#why" className="hover:text-foreground">Why Maai</a>
+          <a href="#why" className="hover:text-foreground">Why EndoHer</a>
           <a href="#story" className="hover:text-foreground">Story</a>
         </nav>
         <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ function Hero() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" className="rounded-full border-border bg-background px-6" asChild>
-              <a href="#how">How Maai listens</a>
+              <a href="#how">How EndoHer listens</a>
             </Button>
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-warm-grey">
@@ -132,6 +132,8 @@ function Hero() {
 }
 
 function LogPreview() {
+  const pain = 6;
+  const pct = pain * 10;
   return (
     <div className="relative mx-auto max-w-md">
       <div
@@ -144,46 +146,85 @@ function LogPreview() {
       />
       <Card className="rounded-[2rem] border-border/60 bg-card p-6 shadow-xl">
         <div className="flex items-center justify-between text-xs text-warm-grey">
-          <span className="font-medium uppercase tracking-[0.2em]">Today · Tue</span>
+          <span className="font-medium uppercase tracking-[0.2em]">Today's check-in</span>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            08:24
+            Step 1 of 3
           </span>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-border/60 bg-parchment p-4 text-sm leading-relaxed text-charcoal">
-          "Sharp cramps low on the left side since yesterday afternoon.
-          Worse when I stand up. Woke twice in the night. Really tired this morning."
+        <h3 className="mt-4 font-serif text-2xl leading-snug tracking-tight text-charcoal">
+          Pain during the day
+        </h3>
+        <p className="mt-1 text-sm text-warm-grey">
+          Your overall pain experience across today, not just this moment.
+        </p>
+
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex-1">
+            <div className="relative h-2 w-full rounded-full bg-stone/60">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                style={{ width: `${pct}%` }}
+              />
+              <div
+                className="absolute -top-1.5 h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm"
+                style={{ left: `calc(${pct}% - 10px)` }}
+              />
+            </div>
+            <div className="mt-3 flex justify-between text-[11px] text-warm-grey">
+              <span>No pain</span>
+              <span>Worst imaginable</span>
+            </div>
+          </div>
+          <div
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-charcoal"
+            style={{ background: "color-mix(in oklab, var(--color-pink) 55%, transparent)", fontFamily: "Fraunces, serif" }}
+            aria-label={`Pain rating ${pain} out of 10`}
+          >
+            <span className="text-3xl leading-none">{pain}</span>
+          </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-6 border-t border-border/60 pt-4">
           <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-warm-grey">
-            Mapped to clinical terms
+            Pain site
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
-              { label: "Dysmenorrhea", tint: "pink" },
-              { label: "Left-sided pelvic pain", tint: "powder" },
-              { label: "Nocturnal waking", tint: "butter" },
-              { label: "Fatigue", tint: "sage" },
-            ].map((t) => (
+              { label: "Pelvis", active: true },
+              { label: "Lower back", active: true },
+              { label: "Abdomen", active: false },
+              { label: "Legs", active: false },
+            ].map((c) => (
               <span
-                key={t.label}
-                className="rounded-full px-3 py-1 text-xs font-medium text-charcoal"
-                style={{ background: `color-mix(in oklab, var(--color-${t.tint}) 45%, transparent)` }}
+                key={c.label}
+                className="rounded-full border px-3 py-1 text-xs font-medium"
+                style={
+                  c.active
+                    ? {
+                        background: "color-mix(in oklab, var(--color-pink) 45%, transparent)",
+                        borderColor: "color-mix(in oklab, var(--color-pink) 70%, transparent)",
+                        color: "var(--color-charcoal)",
+                      }
+                    : {
+                        background: "transparent",
+                        borderColor: "color-mix(in oklab, var(--color-stone) 80%, transparent)",
+                        color: "var(--color-warm-grey)",
+                      }
+                }
               >
-                {t.label}
+                {c.label}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="mt-6 border-t border-border/60 pt-4">
-          <div className="flex items-center justify-between text-xs text-warm-grey">
-            <span>Pattern over 6 weeks</span>
-            <span className="text-charcoal">12 entries</span>
-          </div>
-          <PatternStrip />
+        <div className="mt-6 flex justify-end">
+          <span className="inline-flex items-center gap-1 rounded-full bg-charcoal px-4 py-2 text-xs font-semibold text-background">
+            Continue
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </Card>
 
@@ -239,9 +280,9 @@ function Statistics() {
     <section id="why" className="border-y border-border/40 bg-secondary/40">
       <div className="mx-auto max-w-6xl px-6 py-16">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">Why Maai exists</p>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">Why EndoHer exists</p>
           <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-charcoal sm:text-4xl">
-            Endometriosis is hard to name — and easy to dismiss.
+            Endometriosis is hard to name, and easy to dismiss.
           </h2>
         </div>
 
@@ -265,7 +306,7 @@ function Statistics() {
 
         <p className="mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-warm-grey">
           Almost half visited their GP ten or more times before anyone joined the dots.
-          Maai helps you be harder to dismiss.
+          EndoHer helps you be harder to dismiss.
         </p>
       </div>
     </section>
@@ -293,12 +334,12 @@ const steps = [
   {
     icon: NotebookPen,
     title: "Describe it in your own words",
-    body: "Any level of detail. A sentence a day is enough. Maai never asks you to translate your body into a form.",
+    body: "Any level of detail. A sentence a day is enough. EndoHer never asks you to translate your body into a form.",
     tint: "pink",
   },
   {
     icon: Sparkles,
-    title: "Maai maps to clinical terms",
+    title: "EndoHer maps to clinical terms",
     body: "Your words are gently mapped to the vocabulary a doctor recognises. Nothing is diagnosed. Nothing is decided.",
     tint: "powder",
   },
@@ -314,7 +355,7 @@ function HowItWorks() {
   return (
     <section id="how" className="mx-auto max-w-6xl px-6 py-24">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">How Maai listens</p>
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-warm-grey">How EndoHer listens</p>
         <h2 className="mt-3 font-serif text-4xl leading-tight tracking-tight text-charcoal sm:text-5xl">
           The meaningful interval between things.
         </h2>
@@ -358,9 +399,9 @@ function HowItWorks() {
 
 function QuietPromise() {
   const promises = [
-    "Maai never draws conclusions.",
-    "Maai never replaces your clinician.",
-    "Your words are yours — export or delete, always.",
+    "EndoHer never draws conclusions.",
+    "EndoHer never replaces your clinician.",
+    "Your words are yours, export or delete, always.",
     "Log in the language your body speaks.",
   ];
   return (
@@ -372,8 +413,8 @@ function QuietPromise() {
             A record, never a diagnosis.
           </h2>
           <p className="mt-4 max-w-lg text-warm-grey">
-            Maai maps your words to clinical terms a doctor recognises — never replacing them,
-            never drawing conclusions. The clinician interprets. Maai helps you be heard.
+            EndoHer maps your words to clinical terms a doctor recognises, never replacing them,
+            never drawing conclusions. The clinician interprets. EndoHer helps you be heard.
           </p>
         </div>
         <ul className="space-y-3">
@@ -404,11 +445,11 @@ function Testimonial() {
       <Quote className="mx-auto h-8 w-8 text-primary" />
       <blockquote className="mt-6 font-serif text-3xl leading-tight tracking-tight text-charcoal sm:text-4xl">
         “For the first time I walked into an appointment with the words for what I'd been
-        living with. My GP paused, read the page, and said — okay. Let's look at this
+        living with. My GP paused, read the page, and said, okay. Let's look at this
         properly.”
       </blockquote>
       <div className="mt-6 text-sm text-warm-grey">
-        Anonymous · Maai user, 14 months to diagnosis
+        Anonymous · EndoHer user, 14 months to diagnosis
       </div>
     </section>
   );
@@ -463,7 +504,7 @@ function Footer() {
         </div>
         {[
           { title: "Product", items: ["How it works", "Languages", "Privacy"] },
-          { title: "For clinicians", items: ["The Maai record", "Research", "Contact"] },
+          { title: "For clinicians", items: ["The EndoHer record", "Research", "Contact"] },
           { title: "Legal", items: ["Privacy", "Terms", "Data & you"] },
         ].map((c) => (
           <div key={c.title}>
@@ -478,8 +519,8 @@ function Footer() {
       </div>
       <div className="border-t border-border/40">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-warm-grey">
-          <span>© {new Date().getFullYear()} Maai. Made with care.</span>
-          <span>Maai does not diagnose. Always consult a clinician.</span>
+          <span>© {new Date().getFullYear()} EndoHer. Made with care.</span>
+          <span>EndoHer does not diagnose. Always consult a clinician.</span>
         </div>
       </div>
     </footer>

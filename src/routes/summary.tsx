@@ -14,7 +14,7 @@ const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
 export const Route = createFileRoute("/summary")({
   head: () => ({
     meta: [
-      { title: "Summary · Maai" },
+      { title: "Summary · EndoHer" },
       { name: "description", content: "Your summary notes for doctors, pain trend, and generated report history." },
       { name: "robots", content: "noindex" },
     ],

@@ -20,7 +20,7 @@ export const Route = createFileRoute("/doctor-report")({
   validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
-      { title: "Doctor report · Maai" },
+      { title: "Doctor report · EndoHer" },
       { name: "description", content: "A print-ready symptom summary prepared for clinical review." },
       { name: "robots", content: "noindex" },
     ],

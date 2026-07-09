@@ -5,11 +5,11 @@ import { ArrowLeft, ArrowRight, Check, FileUp, Save } from "lucide-react";
 export const Route = createFileRoute("/diagnosis-profile")({
   head: () => ({
     meta: [
-      { title: "Your diagnosis profile · Maai" },
+      { title: "Your diagnosis profile · EndoHer" },
       {
         name: "description",
         content:
-          "Tell Maai about your endometriosis diagnosis so tracking, treatment response and doctor summaries can be personalised.",
+          "Tell EndoHer about your endometriosis diagnosis so tracking, treatment response and doctor summaries can be personalised.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -234,7 +234,7 @@ function DiagnosisProfilePage() {
           Tell us about your diagnosis
         </h1>
         <p className="mt-2 text-sm" style={{ color: C.muted }}>
-          Add what you know. You can skip anything you are unsure about. This helps Maai personalise tracking,
+          Add what you know. You can skip anything you are unsure about. This helps EndoHer personalise tracking,
           treatment response, recurrence monitoring, and doctor summaries.
         </p>
 
@@ -293,7 +293,7 @@ function DiagnosisProfilePage() {
               <div>
                 <p className="font-semibold">Diagnosis profile saved.</p>
                 <p className="mt-1" style={{ color: C.muted }}>
-                  Maai will use this to personalise your flare tracking, treatment timeline, recurrence
+                  EndoHer will use this to personalise your flare tracking, treatment timeline, recurrence
                   monitoring, and doctor summaries.
                 </p>
                 <button
