@@ -2002,7 +2002,7 @@ export function ReportPreviewCard({
           {stats.trend.thisCount} of the last 7 days were logged this week
           {stats.trend.prevCount > 0 ? `, and ${stats.trend.prevCount} the week before` : ""}.
           {stats.trend.thisAvg != null && stats.trend.prevAvg != null && stats.trend.delta != null && (
-            <> Average burden score is trending {stats.trend.delta > 0 ? "upward" : stats.trend.delta < 0 ? "downward" : "flat"} week-on-week — <strong>{stats.trend.thisAvg}</strong> this week vs <strong>{stats.trend.prevAvg}</strong> the week before.</>
+            <> Average score is trending {stats.trend.delta > 0 ? "upward" : stats.trend.delta < 0 ? "downward" : "flat"} week-on-week — <strong>{stats.trend.thisAvg}</strong> this week vs <strong>{stats.trend.prevAvg}</strong> the week before.</>
           )}
           {stats.trend.thisAvg == null && " Not enough data this week to compute a weekly average."}
         </p>
@@ -2045,17 +2045,6 @@ export function ReportPreviewCard({
         Maai's score and flare thresholds are tracking aids modelled on validated instruments (NRS, EHP-5) — they are not diagnoses or clinically validated cutoffs. This summary reflects patient-reported data only and is intended to support, not replace, clinical assessment.
       </div>
 
-      {error && (
-        <div className="mt-4 rounded-2xl p-3 text-sm" style={{ background: C.redSoft, color: C.red }}>
-          {error}
-        </div>
-      )}
-
-      <div className="mt-6 flex justify-end">
-        <PrimaryButton onClick={generate} disabled={submitting}>
-          {submitting ? "Generating…" : "Generate report"}
-        </PrimaryButton>
-      </div>
     </SoftCard>
   );
 }
@@ -2152,7 +2141,7 @@ function TrendMiniCard({
         {label}
       </div>
       <dl className="mt-3 space-y-2 text-sm">
-        <TrendRow k="Avg burden score">
+        <TrendRow k="Average score">
           {avg == null ? "—" : (
             <>
               <span className="font-semibold">{avg}</span>
