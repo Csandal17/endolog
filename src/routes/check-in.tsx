@@ -3,8 +3,7 @@ import { CheckInProvider, useCheckIn } from "@/lib/check-in-store";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { useState } from "react";
-import { Heart } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export const Route = createFileRoute("/check-in")({
   head: () => ({
@@ -85,7 +84,17 @@ function WizardShell() {
 
 function StepPain({ onContinue }: { onContinue: () => void }) {
   const { dayRecord, setDayRecord } = useCheckIn();
-  const [touched, setTouched] = useState(false);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [showTip, setShowTip] = useState(false);
+  const [thumbPct, setThumbPct] = useState(dayRecord.pain * 10);
+
+  useEffect(() => {
+    setThumbPct(dayRecord.pain * 10);
+  }, [dayRecord.pain]);
+
+  const openTip = () => setShowTip(true);
+  const closeTip = () => setShowTip(false);
+
   return (
     <div>
       <h2 className="font-serif text-2xl text-foreground">Pain during the day</h2>
@@ -95,16 +104,31 @@ function StepPain({ onContinue }: { onContinue: () => void }) {
 
       <div className="mt-8 flex items-center gap-6">
         <div className="flex-1">
-          <Slider
-            value={[dayRecord.pain]}
-            min={0}
-            max={10}
-            step={1}
-            onValueChange={([v]) => {
-              setTouched(true);
-              setDayRecord((prev) => ({ ...prev, pain: v }));
-            }}
-          />
+          <div
+            ref={trackRef}
+            className="relative"
+            onPointerEnter={openTip}
+            onPointerDown={openTip}
+            onPointerLeave={closeTip}
+            onPointerUp={closeTip}
+            onPointerCancel={closeTip}
+            onFocusCapture={openTip}
+            onBlurCapture={closeTip}
+            onTouchStart={openTip}
+            onTouchEnd={closeTip}
+          >
+            <PainTooltip value={dayRecord.pain} pct={thumbPct} visible={showTip} />
+            <Slider
+              value={[dayRecord.pain]}
+              min={0}
+              max={10}
+              step={1}
+              onValueChange={([v]) => {
+                setShowTip(true);
+                setDayRecord((prev) => ({ ...prev, pain: v }));
+              }}
+            />
+          </div>
           <div className="mt-3 flex justify-between text-xs text-muted-foreground">
             <span>No pain</span>
             <span>Worst imaginable</span>
@@ -116,8 +140,6 @@ function StepPain({ onContinue }: { onContinue: () => void }) {
         </div>
       </div>
 
-      {touched ? <ReassuranceBanner kind="pain" value={dayRecord.pain} /> : null}
-
       <div className="mt-8 flex justify-end">
         <Button onClick={onContinue}>Continue</Button>
       </div>
@@ -125,80 +147,67 @@ function StepPain({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-type BannerContent = { stat: string; message: string };
+const PAIN_MESSAGES: Record<number, string> = {
+  0: "No pain today. This is useful information too.",
+  1: "Mild discomfort. Small changes can still help show your pattern.",
+  2: "Low pain logged. Recording it early helps build your symptom history.",
+  3: "Mild to moderate pain. Let's note where it was and what it felt like.",
+  4: "Moderate pain. We'll ask a few quick follow-up questions.",
+  5: "Noticeable pain. Let's capture the location, symptoms, and what helped.",
+  6: "Strong pain. We'll record this clearly in your symptom history.",
+  7: "Severe pain. This is a high-burden day, so let's capture the details.",
+  8: "Very severe pain. You should not have to explain this from memory later.",
+  9: "Extremely severe pain. This is important to record clearly.",
+  10: "Worst pain. We'll help you document this for future clinical review.",
+};
 
-function painBanner(v: number): BannerContent {
-  if (v === 0)
-    return {
-      stat: "Around 1 in 10 women live with pelvic pain — pain-free days matter just as much to track.",
-      message:
-        "So glad today felt gentle on your body. Logging the calm days helps your future self see the whole picture. 🌿",
-    };
-  if (v <= 3)
-    return {
-      stat: "Roughly 60% of women with endometriosis describe most days as 'mild but present' background pain.",
-      message:
-        "Even quieter pain deserves to be noticed. You're not overreacting by naming it — you're taking care of yourself. 💛",
-    };
-  if (v <= 6)
-    return {
-      stat: "Studies show moderate pelvic pain lasts an average of 7 years before diagnosis. You're not imagining it.",
-      message:
-        "This kind of day is heavy, and you're still showing up for yourself. That takes real strength. We're with you. 🤍",
-    };
-  if (v <= 8)
-    return {
-      stat: "More than 70% of women with endometriosis report pain this severe at some point in a typical month.",
-      message:
-        "You are so far from alone in this. Please be gentle with yourself tonight — rest is productive too. 🌸",
-    };
-  return {
-    stat: "1 in 3 women with endo describe pain that reaches this level. Your experience is real, and it is valid.",
-    message:
-      "We're so sorry today has hurt this much. Thank you for still logging — every entry helps you be believed. You are held. 💗",
-  };
-}
-
-function ReassuranceBanner({
-  kind,
+function PainTooltip({
   value,
+  pct,
+  visible,
 }: {
-  kind: "pain";
   value: number;
+  pct: number;
+  visible: boolean;
 }) {
-  const content = kind === "pain" ? painBanner(value) : painBanner(value);
+  const clampedPct = Math.max(0, Math.min(100, pct));
   return (
     <div
-      className="mt-8 rounded-2xl border p-5 sm:p-6"
-      style={{
-        background: "#FBE9B8",
-        borderColor: "#E8DFD1",
-        color: "#141210",
-      }}
+      aria-hidden={!visible}
+      className="pointer-events-none absolute left-0 right-0 z-20"
+      style={{ top: -12, transform: "translateY(-100%)" }}
     >
-      <div className="flex items-start gap-3">
+      <div className="relative h-0">
         <div
-          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-          style={{ background: "#F5B8DB" }}
+          className="absolute"
+          style={{
+            left: `${clampedPct}%`,
+            transform: "translateX(-50%)",
+            maxWidth: 240,
+            width: "max-content",
+            opacity: visible ? 0.92 : 0,
+            transition: "opacity 180ms ease",
+          }}
         >
-          <Heart className="h-4 w-4" style={{ color: "#141210" }} />
-        </div>
-        <div className="min-w-0">
-          <p
-            className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: "#646059" }}
+          <div
+            className="rounded-xl border px-3 py-2 shadow-md"
+            style={{
+              background: "#FFFDF7",
+              borderColor: "#E8DFD1",
+              color: "#3B1F2B",
+              boxShadow: "0 6px 18px rgba(59,31,43,0.12)",
+            }}
           >
-            You're not alone
-          </p>
-          <p
-            className="mt-1 text-base leading-snug sm:text-lg"
-            style={{ fontFamily: "Fraunces, DM Serif Display, Georgia, serif" }}
-          >
-            {content.message}
-          </p>
-          <p className="mt-2 text-sm" style={{ color: "#646059" }}>
-            {content.stat}
-          </p>
+            <p
+              className="text-[13px] font-semibold leading-tight"
+              style={{ color: "#3B1F2B" }}
+            >
+              Pain {value} out of 10
+            </p>
+            <p className="mt-1 text-[12px] leading-snug" style={{ color: "#5A3B48" }}>
+              {PAIN_MESSAGES[value]}
+            </p>
+          </div>
         </div>
       </div>
     </div>
