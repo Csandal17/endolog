@@ -17,6 +17,29 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import * as api from "@/services/api";
 import type { Report as ApiReport } from "@/services/api";
+import { EmpathyBanner, EmpathyBannerStack, type SymptomKey } from "@/components/empathy-banner";
+
+const PATHWAY_KEY = "maai:pathway";
+
+function logToSymptomKeys(log: {
+  siteDescriptors: Record<string, string[]>;
+  wholeBody: string[];
+  bleedingUnexpected: boolean | null;
+  pain: number;
+}): SymptomKey[] {
+  const keys = new Set<SymptomKey>();
+  const sites = Object.keys(log.siteDescriptors);
+  if (sites.includes("Pelvis")) keys.add("pelvic-pain");
+  if (sites.includes("Lower back")) keys.add("back-pain");
+  if (sites.includes("Bowel")) keys.add("bowel");
+  if (sites.includes("Bladder")) keys.add("bladder");
+  if (sites.includes("During or after sex")) keys.add("pain-during-sex");
+  if (log.wholeBody.includes("Fatigue")) keys.add("fatigue");
+  if (log.wholeBody.includes("Bloating")) keys.add("bloating");
+  if (log.wholeBody.includes("Bleeding") || log.bleedingUnexpected) keys.add("bleeding");
+  if (keys.size === 0 && log.pain > 0) keys.add("period-pain");
+  return Array.from(keys);
+}
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
