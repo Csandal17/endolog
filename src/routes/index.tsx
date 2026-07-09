@@ -91,11 +91,10 @@ function Hero() {
             The AI health advocate for endometriosis
           </Badge>
           <h1 className="mt-6 font-serif text-5xl leading-[1.02] tracking-tight text-charcoal sm:text-6xl lg:text-[68px]">
-            Better conversations. Better care.
+            You know your body best.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-warm-grey">
-            Log what you've been experiencing in your own words. Bring a clear record
-            to every appointment.
+            Keep a timeline of your symptoms so every appointment starts with the full picture.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button size="lg" className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90" asChild>
