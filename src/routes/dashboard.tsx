@@ -1324,14 +1324,48 @@ function LineChart({ points }: { points: TrendPoint[] }) {
   });
   if (current.length) segments.push(current.join(" "));
 
+  // Build contiguous flare bands (consecutive indices with flare=true).
+  const bands: { start: number; end: number }[] = [];
+  {
+    let s: number | null = null;
+    points.forEach((p, i) => {
+      if (p.flare) {
+        if (s == null) s = i;
+      } else if (s != null) {
+        bands.push({ start: s, end: i - 1 });
+        s = null;
+      }
+    });
+    if (s != null) bands.push({ start: s, end: points.length - 1 });
+  }
+
   return (
     <div className="w-full overflow-x-auto">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full min-w-[520px]"
         role="img"
-        aria-label="Pain over time"
+        aria-label="Symptom burden over time"
       >
+        {/* flare episode bands */}
+        {bands.map((b, i) => {
+          const half = stepX / 2 || 12;
+          const x = xFor(b.start) - half;
+          const w = xFor(b.end) - xFor(b.start) + half * 2;
+          return (
+            <rect
+              key={`band-${i}`}
+              x={Math.max(padL, x)}
+              y={padT}
+              width={Math.min(W - padR - Math.max(padL, x), w)}
+              height={innerH}
+              fill={C.flareBand}
+              opacity={0.7}
+              rx={6}
+            />
+          );
+        })}
+
         {/* y-axis gridlines: 0, 2, 4, 6, 8, 10 */}
         {[0, 2, 4, 6, 8, 10].map((v) => (
           <g key={v}>
@@ -1377,10 +1411,10 @@ function LineChart({ points }: { points: TrendPoint[] }) {
               <circle
                 cx={xFor(i)}
                 cy={yFor(p.value)}
-                r={p.flare ? 6 : 4}
-                fill={p.flare ? C.red : "#fff"}
-                stroke={p.flare ? C.red : C.deep}
-                strokeWidth={p.flare ? 3 : 1.5}
+                r={p.flare ? 6 : 4.5}
+                fill={painSeverityColor(p.value)}
+                stroke={p.flare ? C.deep : "#FFFFFF"}
+                strokeWidth={p.flare ? 2 : 1.5}
               />
             </g>
           ),
@@ -1407,17 +1441,19 @@ function LineChart({ points }: { points: TrendPoint[] }) {
         style={{ color: C.muted }}
       >
         <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full border"
-            style={{ borderColor: C.deep, background: "#fff" }}
-          />
-          Average pain (0–10)
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.green }} />
+          Mild
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-3 w-3 rounded-full border-[2px]"
-            style={{ borderColor: C.red, background: C.red }}
-          />
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.moderate }} />
+          Moderate
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.red }} />
+          Severe
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-4 rounded-sm" style={{ background: C.flareBand }} />
           Flare episode
         </span>
       </div>
