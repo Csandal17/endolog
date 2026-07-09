@@ -658,12 +658,18 @@ function Step1({
             <span>Worst imaginable</span>
           </div>
         </div>
-        <div
-          className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl"
-          style={{ background: C.light, color: C.deep, fontFamily: "Fraunces, serif" }}
-        >
-          <span className="text-4xl">{pain}</span>
-        </div>
+        {(() => {
+          const { bg, fg } = painChipColors(pain);
+          return (
+            <div
+              className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl transition-colors duration-300"
+              style={{ background: bg, color: fg, fontFamily: "Fraunces, serif" }}
+              aria-label={`Pain rating ${pain} out of 10`}
+            >
+              <span className="text-4xl">{pain}</span>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="mt-8 flex justify-end">
