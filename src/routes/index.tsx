@@ -99,9 +99,9 @@ function Hero() {
             The AI health advocate for endometriosis
           </Badge>
           <h1 className="mt-6 font-serif text-5xl leading-[1.02] tracking-tight text-charcoal sm:text-6xl lg:text-[68px]">
-            <span className="block">You know</span>
+            <span className="block">How she feels</span>
             <span className="block">
-              <span className="text-pink">your body</span> best
+              <span className="text-pink">IS</span> valid
             </span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-warm-grey">
