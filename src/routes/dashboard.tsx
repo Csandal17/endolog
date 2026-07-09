@@ -376,10 +376,11 @@ function Header() {
         YOUR LOG
       </p>
       <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
-        Log what you've been experiencing in your own words. Bring a clear record to every appointment.
+        Tell us how you've been.
       </h1>
       <p className="mt-3 text-muted-foreground">
-        See what time reveals. Maai means the meaningful interval between things — the space where health patterns emerge.
+        Describe it in your own words, however feels natural. Maai turns it into a clear record
+        you can bring to your next appointment.
       </p>
     </div>
   );
