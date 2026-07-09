@@ -132,6 +132,8 @@ function Hero() {
 }
 
 function LogPreview() {
+  const pain = 6;
+  const pct = pain * 10;
   return (
     <div className="relative mx-auto max-w-md">
       <div
@@ -144,46 +146,85 @@ function LogPreview() {
       />
       <Card className="rounded-[2rem] border-border/60 bg-card p-6 shadow-xl">
         <div className="flex items-center justify-between text-xs text-warm-grey">
-          <span className="font-medium uppercase tracking-[0.2em]">Today · Tue</span>
+          <span className="font-medium uppercase tracking-[0.2em]">Today's check-in</span>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            08:24
+            Step 1 of 3
           </span>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-border/60 bg-parchment p-4 text-sm leading-relaxed text-charcoal">
-          "Sharp cramps low on the left side since yesterday afternoon.
-          Worse when I stand up. Woke twice in the night. Really tired this morning."
+        <h3 className="mt-4 font-serif text-2xl leading-snug tracking-tight text-charcoal">
+          Pain during the day
+        </h3>
+        <p className="mt-1 text-sm text-warm-grey">
+          Your overall pain experience across today, not just this moment.
+        </p>
+
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex-1">
+            <div className="relative h-2 w-full rounded-full bg-stone/60">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                style={{ width: `${pct}%` }}
+              />
+              <div
+                className="absolute -top-1.5 h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm"
+                style={{ left: `calc(${pct}% - 10px)` }}
+              />
+            </div>
+            <div className="mt-3 flex justify-between text-[11px] text-warm-grey">
+              <span>No pain</span>
+              <span>Worst imaginable</span>
+            </div>
+          </div>
+          <div
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-charcoal"
+            style={{ background: "color-mix(in oklab, var(--color-pink) 55%, transparent)", fontFamily: "Fraunces, serif" }}
+            aria-label={`Pain rating ${pain} out of 10`}
+          >
+            <span className="text-3xl leading-none">{pain}</span>
+          </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-6 border-t border-border/60 pt-4">
           <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-warm-grey">
-            Mapped to clinical terms
+            Pain site
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
-              { label: "Dysmenorrhea", tint: "pink" },
-              { label: "Left-sided pelvic pain", tint: "powder" },
-              { label: "Nocturnal waking", tint: "butter" },
-              { label: "Fatigue", tint: "sage" },
-            ].map((t) => (
+              { label: "Pelvis", active: true },
+              { label: "Lower back", active: true },
+              { label: "Abdomen", active: false },
+              { label: "Legs", active: false },
+            ].map((c) => (
               <span
-                key={t.label}
-                className="rounded-full px-3 py-1 text-xs font-medium text-charcoal"
-                style={{ background: `color-mix(in oklab, var(--color-${t.tint}) 45%, transparent)` }}
+                key={c.label}
+                className="rounded-full border px-3 py-1 text-xs font-medium"
+                style={
+                  c.active
+                    ? {
+                        background: "color-mix(in oklab, var(--color-pink) 45%, transparent)",
+                        borderColor: "color-mix(in oklab, var(--color-pink) 70%, transparent)",
+                        color: "var(--color-charcoal)",
+                      }
+                    : {
+                        background: "transparent",
+                        borderColor: "color-mix(in oklab, var(--color-stone) 80%, transparent)",
+                        color: "var(--color-warm-grey)",
+                      }
+                }
               >
-                {t.label}
+                {c.label}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="mt-6 border-t border-border/60 pt-4">
-          <div className="flex items-center justify-between text-xs text-warm-grey">
-            <span>Pattern over 6 weeks</span>
-            <span className="text-charcoal">12 entries</span>
-          </div>
-          <PatternStrip />
+        <div className="mt-6 flex justify-end">
+          <span className="inline-flex items-center gap-1 rounded-full bg-charcoal px-4 py-2 text-xs font-semibold text-background">
+            Continue
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </Card>
 
