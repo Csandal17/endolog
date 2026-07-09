@@ -2045,17 +2045,6 @@ export function ReportPreviewCard({
         Maai's score and flare thresholds are tracking aids modelled on validated instruments (NRS, EHP-5) — they are not diagnoses or clinically validated cutoffs. This summary reflects patient-reported data only and is intended to support, not replace, clinical assessment.
       </div>
 
-      {error && (
-        <div className="mt-4 rounded-2xl p-3 text-sm" style={{ background: C.redSoft, color: C.red }}>
-          {error}
-        </div>
-      )}
-
-      <div className="mt-6 flex justify-end">
-        <PrimaryButton onClick={generate} disabled={submitting}>
-          {submitting ? "Generating…" : "Generate report"}
-        </PrimaryButton>
-      </div>
     </SoftCard>
   );
 }
