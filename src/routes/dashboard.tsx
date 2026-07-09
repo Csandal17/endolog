@@ -32,17 +32,18 @@ export const Route = createFileRoute("/dashboard")({
 // ---------------- Palette (inline via style so we don't disturb design tokens) ----------------
 
 const C = {
-  bg: "#F5F3F7",
+  // Aligned with the landing page palette (parchment / pink / powder / sage / butter)
+  bg: "#F3EDE3",       // parchment background
   card: "#FFFFFF",
-  text: "#2B2333",
-  muted: "#6E6579",
-  border: "#E4DFEA",
-  accent: "#D99A1B",
-  deep: "#B37D0E",
-  light: "#FDF3E3",
-  pink: "#F7DCEB",
-  green: "#DDE8C8",
-  blue: "#DDEAF7",
+  text: "#141210",     // charcoal
+  muted: "#646059",    // warm grey
+  border: "#E8DFD1",
+  accent: "#F5B8DB",   // soft pink (primary)
+  deep: "#141210",     // charcoal for text on accent
+  light: "#FBE9B8",    // soft butter for highlights
+  pink: "#F5B8DB",
+  green: "#D6E1B4",    // sage tint
+  blue: "#B6CAEB",     // powder blue
 };
 
 // ---------------- Data model ----------------
