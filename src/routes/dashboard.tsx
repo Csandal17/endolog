@@ -948,9 +948,225 @@ function FlareMessage({ flare }: { flare: FlareState }) {
   );
 }
 
-// ---------------- Pattern over time ----------------
+// ---------------- Weekly log ----------------
 
-function PatternOverTime({
+function WeeklyLog({
+  logs,
+  onDelete,
+  onClear,
+}: {
+  logs: DailyLog[];
+  onDelete: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
+  const days = useMemo(() => buildWeekDays(logs, weekOffset), [logs, weekOffset]);
+  const today = todayStr();
+  const todayLogs = logs.filter((l) => l.date === today);
+  const todayScore = todayLogs.length ? Math.max(...todayLogs.map((l) => l.burden)) : 0;
+  const { baseline } = computeBaseline(logs, today);
+  const threshold = flareThreshold(baseline);
+  const yesterday = shiftDate(today, -1);
+  const yLogs = logs.filter((l) => l.date === yesterday);
+  const yPeak = yLogs.length ? Math.max(...yLogs.map((l) => l.burden)) : null;
+  const yElevated = threshold != null && yPeak != null && yPeak > threshold;
+  const yConfirmed = yElevated && flare.ids.has(yLogs.find((l) => l.burden === yPeak)!.id);
+
+  const rangeLabel = weekLabel(weekOffset);
+
+  return (
+    <SoftCard>
+      <div className="flex items-center justify-between gap-4">
+        <div className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: C.muted }}>
+          Weekly log
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setWeekOffset((w) => w - 1)}
+            className="grid h-8 w-8 place-items-center rounded-full border"
+            style={{ borderColor: C.border, color: C.text, background: "#fff" }}
+            aria-label="Previous week"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold" style={{ color: C.text }}>
+            {rangeLabel}
+          </span>
+          <button
+            onClick={() => setWeekOffset((w) => Math.min(0, w + 1))}
+            disabled={weekOffset >= 0}
+            className="grid h-8 w-8 place-items-center rounded-full border disabled:opacity-40"
+            style={{ borderColor: C.border, color: C.text, background: "#fff" }}
+            aria-label="Next week"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-7 gap-2 sm:gap-4">
+        {days.map((d) => {
+          const isToday = d.date === today;
+          const log = d.log;
+          const isFlare = log ? flare.ids.has(log.id) : false;
+          const severity: ScoreBreakdown["severity"] = log
+            ? calcScore({
+                pain: log.pain,
+                siteDescriptors: log.siteDescriptors,
+                wholeBody: log.wholeBody,
+                bleedingUnexpected: log.bleedingUnexpected,
+                impact: log.impactChosen ? log.impact : 0,
+              }).severity
+            : "No symptoms";
+          return (
+            <div key={d.date} className="flex flex-col items-center gap-2">
+              {log ? (
+                <button
+                  onClick={() => onDelete(log.id)}
+                  title={`Remove ${d.label}`}
+                  className="rounded-full"
+                >
+                  <Flower severity={severity} size={48} outlined={isFlare} />
+                </button>
+              ) : (
+                <UnloggedFlower size={48} highlight={isToday} />
+              )}
+              <span
+                className="text-xs"
+                style={{
+                  color: isToday ? C.deep : C.muted,
+                  fontWeight: isToday ? 700 : 500,
+                }}
+              >
+                {isToday ? "today" : d.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-5 text-xs"
+        style={{ borderColor: C.border, color: C.text }}
+      >
+        <LegendItem icon={<UnloggedFlower size={20} />}>Unlogged / today</LegendItem>
+        <LegendItem icon={<Flower severity="Mild" size={20} />}>Mild</LegendItem>
+        <LegendItem icon={<Flower severity="Moderate" size={20} />}>Moderate</LegendItem>
+        <LegendItem icon={<Flower severity="Severe" size={20} />}>Severe</LegendItem>
+        <LegendItem icon={<Flower severity="Severe" size={20} outlined />}>Flare episode day</LegendItem>
+      </div>
+
+      <div
+        className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm"
+        style={{ color: C.text }}
+      >
+        <span>
+          <span style={{ color: C.muted }}>Your baseline: </span>
+          <span className="font-semibold">{baseline == null ? "—" : Math.round(baseline)}</span>
+        </span>
+        <span>
+          <span style={{ color: C.muted }}>Flare threshold today: </span>
+          <span className="font-semibold">{threshold == null ? "—" : Math.round(threshold)}</span>
+        </span>
+        {yPeak != null && (
+          <span>
+            <span style={{ color: C.muted }}>Yesterday: </span>
+            <span className="font-semibold">
+              {yElevated
+                ? yConfirmed
+                  ? "elevated — confirmed flare"
+                  : "elevated — unconfirmed"
+                : "below threshold"}
+            </span>
+          </span>
+        )}
+        {todayScore > 0 && (
+          <span>
+            <span style={{ color: C.muted }}>Today's burden: </span>
+            <span className="font-semibold">{todayScore}</span>
+          </span>
+        )}
+      </div>
+
+      {logs.length > 0 && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onClear}
+            className="text-xs underline"
+            style={{ color: C.muted }}
+          >
+            Clear all entries
+          </button>
+        </div>
+      )}
+    </SoftCard>
+  );
+}
+
+function LegendItem({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      {icon}
+      <span>{children}</span>
+    </span>
+  );
+}
+
+function shiftDate(date: string, deltaDays: number): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() + deltaDays);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function buildWeekDays(logs: DailyLog[], weekOffset: number) {
+  // Week ends "today + 7*weekOffset" so the current week is the last 7 days ending today.
+  const end = new Date();
+  end.setDate(end.getDate() + weekOffset * 7);
+  const days: { date: string; label: string; log: DailyLog | null }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    const p = (n: number) => String(n).padStart(2, "0");
+    const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    const weekday = d.toLocaleDateString(undefined, { weekday: "short" });
+    const day = d.getDate();
+    const matches = logs.filter((l) => l.date === date);
+    const log = matches.length
+      ? matches.reduce((a, b) => (a.burden >= b.burden ? a : b))
+      : null;
+    days.push({ date, label: `${weekday} ${day}`, log });
+  }
+  return days;
+}
+
+function weekLabel(weekOffset: number): string {
+  if (weekOffset === 0) return "This week";
+  if (weekOffset === -1) return "Last week";
+  return `${Math.abs(weekOffset)} weeks ago`;
+}
+
+function UnloggedFlower({ size = 48, highlight = false }: { size?: number; highlight?: boolean }) {
+  const color = highlight ? C.deep : C.muted;
+  const petals = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      {petals.map((r) => (
+        <g key={r} transform={`rotate(${r} 50 50)`}>
+          {[0, 1, 2, 3].map((i) => (
+            <circle key={i} cx="50" cy={30 - i * 5} r={1.5 - i * 0.2} fill={color} opacity={0.7 - i * 0.15} />
+          ))}
+        </g>
+      ))}
+      <circle cx="50" cy="50" r="4" fill={color} opacity="0.7" />
+    </svg>
+  );
+}
+
+// ---------------- (legacy) Pattern over time list — no longer rendered ----------------
+
+function _PatternOverTime({
   logs,
   onDelete,
   onClear,
