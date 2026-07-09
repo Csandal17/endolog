@@ -133,6 +133,289 @@ function painColor(score: number): string {
   return `hsl(${hue} 65% 45%)`;
 }
 
+// ---------- Reassurance banner data ----------
+
+interface BannerContent {
+  stat: string;
+  message: string;
+}
+
+type BannerData = { key: string; stat: string; message: string } | null;
+
+function getPainBanner(score: number): BannerContent {
+  if (score === 0) {
+    return {
+      stat: "80% of women experience some form of pelvic discomfort in their lifetime.",
+      message: "Taking a moment to check in with your body is a gentle act of self-care. Whatever you feel today is valid.",
+    };
+  }
+  if (score <= 3) {
+    return {
+      stat: "Around 1 in 2 women experience mild to moderate pelvic pain during their cycle.",
+      message: "Even mild signals from your body deserve attention. You're doing something kind by noticing and naming what you feel.",
+    };
+  }
+  if (score <= 6) {
+    return {
+      stat: "Chronic pelvic pain affects roughly 1 in 6 women — it is one of the most common reasons women seek care.",
+      message: "Moderate pain can be exhausting, and it's okay to acknowledge that. Tracking it helps you advocate for yourself with confidence.",
+    };
+  }
+  if (score <= 9) {
+    return {
+      stat: "Severe period pain is experienced by up to 1 in 10 women — many say it took years to feel truly heard.",
+      message: "Severe pain is not something you should have to endure in silence. Your experience is real, and you deserve thorough care and answers.",
+    };
+  }
+  return {
+    stat: "About 1 in 10 women live with pain so intense it disrupts daily life — yet it is still under-recognised in medicine.",
+    message: "If you are in this much pain, please reach out to a clinician as soon as you can. You are not being dramatic. You are not alone.",
+  };
+}
+
+const CHECKBOX_BANNERS: Record<string, BannerContent> = {
+  Pelvis: {
+    stat: "Pelvic pain is one of the most common reasons women visit a GP — it's incredibly common.",
+    message: "Naming where it hurts is a powerful first step. You're building a clear story to share with your clinician.",
+  },
+  "Lower back": {
+    stat: "Lower back pain is reported by up to 70% of women with pelvic conditions — the two are often linked.",
+    message: "It can be so easy to dismiss back pain as 'just stress.' You're allowed to connect it to the bigger picture.",
+  },
+  "Lower abdomen (left)": {
+    stat: "Left-sided abdominal pain has a wide range of causes, many of them treatable.",
+    message: "Noticing the exact side helps your clinician build a much clearer picture. You're doing great.",
+  },
+  "Lower abdomen (right)": {
+    stat: "Right-sided pain is one of the most documented locations in women's health assessments.",
+    message: "Being precise about location gives your care team valuable information. Every detail you share matters.",
+  },
+  Legs: {
+    stat: "Leg pain can be a referred symptom from pelvic conditions — it's more common than many realise.",
+    message: "Pain that travels is real pain. You're not imagining the connection — and now it's on the record.",
+  },
+  "Rectum/back passage": {
+    stat: "Bowel-related pelvic pain is experienced by many women, though it's rarely talked about openly.",
+    message: "This can feel awkward to mention, but it's important clinical information. You're being brave and thorough.",
+  },
+  "Sudden — came on quickly": {
+    stat: "Sudden-onset pain accounts for a significant portion of urgent women's health presentations.",
+    message: "A quick change in how you feel can feel alarming. Trusting that instinct and logging it is exactly the right thing to do.",
+  },
+  "Gradual — built up slowly": {
+    stat: "Gradual symptoms are how many long-term conditions first present — slow change is still meaningful change.",
+    message: "It can be hard to notice something that creeps up. The fact that you're reflecting on it now shows real self-awareness.",
+  },
+  "In the days before my period": {
+    stat: "Premenstrual symptoms affect up to 90% of women at some point — you are far from alone in this.",
+    message: "The days before a period can feel heavy in so many ways. Noticing the pattern is a real gift to your future self.",
+  },
+  "During my period": {
+    stat: "Period pain is the leading cause of missed school and work for women worldwide.",
+    message: "Pain during your period is common, but that doesn't mean you have to accept it without support. You deserve relief.",
+  },
+  "In the days after my period": {
+    stat: "Post-menstrual symptoms are reported by many women and are a recognised part of the cycle for some.",
+    message: "Noticing what happens after bleeding stops is just as important. You're seeing the whole picture, not just the obvious part.",
+  },
+  "Around ovulation (mid-cycle)": {
+    stat: "Ovulation pain, or 'mittelschmerz', is experienced by about 1 in 5 women.",
+    message: "Mid-cycle sensations are easy to overlook. Logging them now gives your clinician a fuller understanding of your cycle.",
+  },
+  "No link to my cycle": {
+    stat: "Pain that isn't cycle-linked is equally important to investigate — it deserves the same careful attention.",
+    message: "Ruling out a cycle link is just as valuable as finding one. You're helping your clinician focus on the right questions.",
+  },
+  "I'm not sure": {
+    stat: "Uncertainty is completely normal — most women say they haven't tracked symptoms closely before.",
+    message: "You don't need to have all the answers right now. Starting to track is already a huge step forward.",
+  },
+  Cramping: {
+    stat: "Cramping is the most commonly described period pain symptom across all age groups.",
+    message: "That gripping, wave-like sensation is real and physical. Describing it as cramping gives your clinician a clear signal.",
+  },
+  Sharp: {
+    stat: "Sharp, stabbing pain is one of the most distressing symptom types women report — and it's always worth investigating.",
+    message: "Sharp pain can feel scary. Naming it precisely helps your care team understand the urgency and nature of what you're feeling.",
+  },
+  Stabbing: {
+    stat: "Stabbing pain is a well-documented descriptor in endometriosis and adenomyosis assessments.",
+    message: "That sudden, piercing quality matters. You're not exaggerating — you're describing something very real.",
+  },
+  Burning: {
+    stat: "Burning sensations are commonly associated with nerve-related or inflammatory pelvic conditions.",
+    message: "Burning is a specific and important symptom. Trust the word that fits what you feel.",
+  },
+  "Dull ache": {
+    stat: "A persistent dull ache is how many women first notice something isn't quite right — it's often the earliest sign.",
+    message: "Dull aches are easy to push through, but they deserve attention too. You are allowed to take this seriously.",
+  },
+  Throbbing: {
+    stat: "Throbbing pain is frequently described in vascular and inflammatory pelvic conditions.",
+    message: "That pulsing, rhythmic quality is a meaningful clinical detail. You're doing so well at describing your experience.",
+  },
+  Nausea: {
+    stat: "Nausea alongside pelvic pain is reported by about 1 in 3 women with endometriosis.",
+    message: "Feeling sick on top of everything else is really hard. It's not 'just stress' — it's a real symptom that belongs in your record.",
+  },
+  Bloating: {
+    stat: "Bloating is one of the top three symptoms women with pelvic conditions report — it's extremely common.",
+    message: "That uncomfortable, swollen feeling is more than just inconvenient. It matters, and you're right to include it.",
+  },
+  Fatigue: {
+    stat: "Fatigue is reported by up to 80% of women living with chronic pelvic pain — it is a real, physical symptom.",
+    message: "Being tired all the time is not a character flaw. It's a signal from your body that deserves just as much care as the pain itself.",
+  },
+  Dizziness: {
+    stat: "Dizziness with pelvic pain can be linked to blood loss, hormonal shifts, or pain response — it's always worth noting.",
+    message: "That lightheaded, unsteady feeling is not something to brush off. You're being smart to log it alongside everything else.",
+  },
+  "Pain when passing a bowel motion": {
+    stat: "Pain during bowel movements is a recognised symptom in endometriosis and other pelvic conditions.",
+    message: "This can feel embarrassing to mention, but it's one of the most helpful details you can share. You are being so thorough.",
+  },
+  "Pain when passing urine": {
+    stat: "Urinary pain is common in many pelvic and bladder conditions — it's a symptom clinicians ask about for good reason.",
+    message: "Burning or pain when peeing is a clear signal. You're not overthinking it — you're paying attention to what your body needs.",
+  },
+  "Heavy bleeding": {
+    stat: "Heavy menstrual bleeding affects up to 1 in 3 women and is one of the most under-reported symptoms.",
+    message: "If your bleeding feels like too much, trust that instinct. 'Heavy' is personal, and your experience is the only definition that matters.",
+  },
+  "Down the legs": {
+    stat: "Leg radiation is a documented feature of several pelvic conditions, including endometriosis.",
+    message: "Pain that travels down your legs is real and valid. You are not making this up — it's a recognised clinical pattern.",
+  },
+  "Towards the rectum/back passage": {
+    stat: "Rectal pain radiation is a key symptom in deep infiltrating endometriosis assessments.",
+    message: "This is one of the most specific symptoms you can report. Being open about it will help your clinician enormously.",
+  },
+  "Towards the vagina": {
+    stat: "Vaginal pain radiation is commonly described in pelvic congestion and inflammatory conditions.",
+    message: "It takes courage to name this. Your openness is helping build a complete and honest clinical picture.",
+  },
+  "Doesn't spread anywhere else": {
+    stat: "Localised pain is just as medically significant as pain that spreads — location itself tells a story.",
+    message: "Knowing that the pain stays in one place is valuable information. Every detail you notice is worth recording.",
+  },
+  Minutes: {
+    stat: "Brief episodes of pelvic pain are common and can still be part of a meaningful pattern.",
+    message: "Even pain that comes and goes quickly is worth noting. Patterns build over time, and every entry counts.",
+  },
+  Hours: {
+    stat: "Pain lasting hours is one of the most commonly logged durations in women's symptom diaries.",
+    message: "Hours of discomfort is a significant chunk of your day. You deserve care that takes that time seriously.",
+  },
+  Days: {
+    stat: "Multi-day pelvic pain is a hallmark symptom of several common gynaecological conditions.",
+    message: "When pain stretches across days, it affects everything. Acknowledging that impact is a brave and necessary step.",
+  },
+  "Constant, doesn't go away": {
+    stat: "Chronic daily pelvic pain affects millions of women — constant pain is never something to ignore.",
+    message: "Living with unrelenting pain is exhausting beyond words. Please keep advocating for yourself — you deserve answers and relief.",
+  },
+  "It's constant": {
+    stat: "Constant pain is one of the strongest indicators that a symptom deserves thorough investigation.",
+    message: "A pain that never lets up wears on more than just your body. You are allowed to want — and demand — answers.",
+  },
+  "It comes and goes": {
+    stat: "Intermittent pain is how many conditions first present — the pattern is just as important as the intensity.",
+    message: "Coming-and-going pain can be frustratingly easy to dismiss. Logging it gives you proof, and that proof is powerful.",
+  },
+  "Moving around": {
+    stat: "Pain worsened by movement is a key diagnostic clue and is documented across many pelvic conditions.",
+    message: "Noticing what makes it worse is real detective work. You're building a detailed, useful record.",
+  },
+  Sex: {
+    stat: "Pain during sex is reported by up to 1 in 10 women — it is far more common than conversations suggest.",
+    message: "This can feel deeply personal to share, but it's one of the most important symptoms to bring to your clinician. You are not alone in this.",
+  },
+  "Bowel movements": {
+    stat: "Bowel-related pain is a well-documented symptom in pelvic assessment — it's a standard, important question.",
+    message: "There's no shame in this. Clinicians ask about it because it matters. You're answering with honesty and strength.",
+  },
+  "Passing urine": {
+    stat: "Urinary pain is one of the most common accompaniments to pelvic conditions in women.",
+    message: "Pain when peeing is your body sending a clear signal. Trust it, and know that help is available.",
+  },
+  Exercise: {
+    stat: "Exercise-triggered pelvic pain is increasingly recognised in sports medicine and women's health.",
+    message: "Wanting to move your body but being held back by pain is frustrating. You're not weak — your body is asking for support.",
+  },
+  Rest: {
+    stat: "Finding relief in rest is one of the most common self-management strategies women report.",
+    message: "Rest is not laziness — it's a valid and important part of managing how you feel. Give yourself permission to slow down.",
+  },
+  "Heat (e.g. hot water bottle)": {
+    stat: "Heat therapy is one of the oldest and most widely used comfort measures for pelvic pain.",
+    message: "That gentle warmth is more than a comfort — it's a recognised, effective way to soothe cramping and tension. You know your body.",
+  },
+  "Painkillers (NSAIDs, e.g. ibuprofen)": {
+    stat: "NSAIDs are the most commonly recommended first-line treatment for period pain worldwide.",
+    message: "Reaching for pain relief is not weakness — it's self-care. You're allowed to seek comfort and support.",
+  },
+  "Hormonal contraception": {
+    stat: "Hormonal treatments help many women manage cyclical symptoms — they are a well-established option.",
+    message: "Finding what works for your body is a journey, not a failure. Every option you explore is a step toward understanding yourself better.",
+  },
+  "Haven't tried NSAIDs": {
+    stat: "Many women haven't tried NSAIDs yet — it's completely okay to be at the beginning of your management journey.",
+    message: "You don't need to have tried everything already. Starting to track and explore options is exactly where many women begin.",
+  },
+  "No relief at all": {
+    stat: "When standard pain relief doesn't work, it's a strong signal that your symptoms deserve deeper investigation.",
+    message: "If ibuprofen doesn't touch the pain, that's important information — not a failure on your part. Your clinician needs to know this.",
+  },
+  "Some relief, but pain continues": {
+    stat: "Partial relief is one of the most common experiences — it tells your care team that something is working, but not enough.",
+    message: "Some help is still help, but you deserve more than 'a bit better.' Keep pushing for answers that fully address what you feel.",
+  },
+  "Fully relieved": {
+    stat: "Complete relief with NSAIDs is a useful diagnostic clue — it helps narrow down the type of pain you're experiencing.",
+    message: "Full relief is wonderful news, and it's also medically useful. Your care team will value knowing this works for you.",
+  },
+};
+
+function ReassuranceBanner({
+  stat,
+  message,
+  onDismiss,
+}: {
+  stat: string;
+  message: string;
+  onDismiss?: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="rounded-2xl border border-powder/60 bg-powder/20 p-5"
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-powder/60">
+          <Sparkles className="h-4 w-4 text-charcoal" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-charcoal">{stat}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-warm-grey">{message}</p>
+        </div>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+          >
+            Dismiss
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function readEntries(): LogEntry[] {
   if (typeof window === "undefined") return [];
   try {
@@ -214,6 +497,8 @@ function Dashboard() {
 
   const setSocrates = (patch: Partial<SocratesAnswers>) =>
     setForm((f) => ({ ...f, socrates: { ...f.socrates, ...patch } }));
+
+  const [banner, setBanner] = useState<BannerData>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -313,6 +598,8 @@ function Dashboard() {
                         socrates: { ...emptySocrates },
                       })
                     }
+                    banner={banner}
+                    onShowBanner={(b) => setBanner({ key: `${Date.now()}`, ...b })}
                   />
                 </motion.div>
               ) : (
@@ -404,6 +691,8 @@ function IntakeCard({
   submitting,
   error,
   onReset,
+  banner,
+  onShowBanner,
 }: {
   form: IntakeForm;
   update: (k: keyof IntakeForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -415,6 +704,8 @@ function IntakeCard({
   submitting: boolean;
   error: string | null;
   onReset: () => void;
+  banner: BannerData;
+  onShowBanner: (b: BannerContent) => void;
 }) {
   return (
     <Card className="rounded-3xl border-border/60 bg-card p-7 shadow-sm">
@@ -449,9 +740,25 @@ function IntakeCard({
           onScore={onPainScore}
           onDateTime={onPainDateTime}
           onNow={onPainDateTimeNow}
+          onShowBanner={onShowBanner}
         />
 
-        <SocratesFields answers={form.socrates} onChange={setSocrates} />
+        <SocratesFields
+          answers={form.socrates}
+          onChange={setSocrates}
+          onShowBanner={onShowBanner}
+        />
+
+        <AnimatePresence>
+          {banner?.stat && (
+            <ReassuranceBanner
+              key={banner.key}
+              stat={banner.stat}
+              message={banner.message}
+              onDismiss={() => onShowBanner({ stat: "", message: "" })}
+            />
+          )}
+        </AnimatePresence>
 
         <Field
           label="What have you been experiencing?"
@@ -534,13 +841,25 @@ function PainNrsField({
   onScore,
   onDateTime,
   onNow,
+  onShowBanner,
 }: {
   score: number;
   recordedAt: string;
   onScore: (n: number) => void;
   onDateTime: (v: string) => void;
   onNow: () => void;
+  onShowBanner?: (b: BannerContent) => void;
 }) {
+  const initialScoreRef = useRef(score);
+  const prevScoreRef = useRef(score);
+  useEffect(() => {
+    if (score !== prevScoreRef.current) {
+      prevScoreRef.current = score;
+      if (score !== initialScoreRef.current && onShowBanner) {
+        onShowBanner(getPainBanner(score));
+      }
+    }
+  }, [score, onShowBanner]);
   const swatch = painColor(score);
   const pct = (score / 10) * 100;
   const label =
@@ -1516,19 +1835,31 @@ function formatSocrates(a: SocratesAnswers): string {
 function SocratesFields({
   answers,
   onChange,
+  onShowBanner,
 }: {
   answers: SocratesAnswers;
   onChange: (patch: Partial<SocratesAnswers>) => void;
+  onShowBanner?: (b: BannerContent) => void;
 }) {
   const toggle = (key: keyof SocratesAnswers, value: string) => {
     const arr = answers[key] as string[];
-    const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+    const isChecking = !arr.includes(value);
+    const next = isChecking ? [...arr, value] : arr.filter((v) => v !== value);
     onChange({ [key]: next } as Partial<SocratesAnswers>);
+    if (isChecking && onShowBanner) {
+      const content = CHECKBOX_BANNERS[value];
+      if (content) onShowBanner(content);
+    }
   };
   const set = (key: keyof SocratesAnswers, value: string) => {
     // toggle-off if same option clicked again
     const current = answers[key] as string;
+    const isSelecting = current !== value && value !== "";
     onChange({ [key]: current === value ? "" : value } as Partial<SocratesAnswers>);
+    if (isSelecting && onShowBanner) {
+      const content = CHECKBOX_BANNERS[value];
+      if (content) onShowBanner(content);
+    }
   };
 
   return (
