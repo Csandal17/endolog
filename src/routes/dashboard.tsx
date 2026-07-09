@@ -1819,19 +1819,31 @@ function formatSocrates(a: SocratesAnswers): string {
 function SocratesFields({
   answers,
   onChange,
+  onShowBanner,
 }: {
   answers: SocratesAnswers;
   onChange: (patch: Partial<SocratesAnswers>) => void;
+  onShowBanner?: (b: BannerContent) => void;
 }) {
   const toggle = (key: keyof SocratesAnswers, value: string) => {
     const arr = answers[key] as string[];
-    const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+    const isChecking = !arr.includes(value);
+    const next = isChecking ? [...arr, value] : arr.filter((v) => v !== value);
     onChange({ [key]: next } as Partial<SocratesAnswers>);
+    if (isChecking && onShowBanner) {
+      const content = CHECKBOX_BANNERS[value];
+      if (content) onShowBanner(content);
+    }
   };
   const set = (key: keyof SocratesAnswers, value: string) => {
     // toggle-off if same option clicked again
     const current = answers[key] as string;
+    const isSelecting = current !== value && value !== "";
     onChange({ [key]: current === value ? "" : value } as Partial<SocratesAnswers>);
+    if (isSelecting && onShowBanner) {
+      const content = CHECKBOX_BANNERS[value];
+      if (content) onShowBanner(content);
+    }
   };
 
   return (
