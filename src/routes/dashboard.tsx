@@ -78,11 +78,11 @@ function painSeverityColor(pain: number): string {
 // ---------------- Data model ----------------
 
 const PAIN_SITES = [
-  { key: "Pelvis", options: ["Cramping", "Stabbing", "Burning", "Dull ache"] },
-  { key: "Lower back", options: ["Cramping", "Dull ache", "Radiating to legs"] },
-  { key: "Bowel", options: ["Pain with bowel movements", "Diarrhoea", "Constipation"] },
+  { key: "Pelvis", options: ["Cramping", "Stabbing", "Burning", "Dull ache", "Pressure"] },
+  { key: "Lower back", options: ["Cramping", "Dull ache", "Radiating to legs", "Stabbing"] },
+  { key: "Bowel", options: ["Pain with bowel movements", "Diarrhoea", "Constipation", "Bloating"] },
   { key: "Bladder", options: ["Pain when urinating", "Urgency", "Frequency"] },
-  { key: "During or after sex", options: ["Deep pain", "Ache afterwards"] },
+  { key: "During or after sex", options: ["Deep pain", "Ache afterwards", "Bleeding afterwards"] },
 ] as const;
 
 const WHOLE_BODY = ["Bloating", "Nausea", "Fatigue", "Dizziness", "Bleeding"] as const;
