@@ -1,0 +1,2 @@
+ALTER TABLE public.patients ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE public.reports ALTER COLUMN user_id DROP NOT NULL;

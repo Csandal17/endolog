@@ -19,19 +19,19 @@ export type Database = {
           created_at: string
           id: string
           input_text: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           input_text: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           input_text?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -43,7 +43,7 @@ export type Database = {
           pdf_url: string | null
           status: string
           structured_data: Json | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -52,7 +52,7 @@ export type Database = {
           pdf_url?: string | null
           status?: string
           structured_data?: Json | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -61,7 +61,7 @@ export type Database = {
           pdf_url?: string | null
           status?: string
           structured_data?: Json | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
