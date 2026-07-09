@@ -342,7 +342,7 @@ function Dashboard() {
 
   return (
     <div style={{ background: C.bg, color: C.text }} className="min-h-screen font-[Karla,system-ui,sans-serif]">
-      <TopBar />
+        <TopBar current="daily" />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="mb-6 sm:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: C.muted }}>
@@ -1171,7 +1171,7 @@ function recurringTerms(logs: DailyLog[]): { term: string; count: number }[] {
 
 // ---------------- Report preview ----------------
 
-function ReportPreviewCard({
+export function ReportPreviewCard({
   logs,
   onGenerated,
 }: {
@@ -1357,7 +1357,7 @@ function StatTile({ label, value, hint }: { label: string; value: number | strin
 
 // ---------------- Report history (server) ----------------
 
-function ReportHistoryCard({ refreshKey }: { refreshKey: number }) {
+export function ReportHistoryCard({ refreshKey }: { refreshKey: number }) {
   const [reports, setReports] = useState<ApiReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
