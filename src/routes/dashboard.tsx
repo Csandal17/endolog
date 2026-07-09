@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import * as api from "@/services/api";
 import type { Report as ApiReport } from "@/services/api";
 import { EmpathyBanner, EmpathyBannerStack, type SymptomKey } from "@/components/empathy-banner";
+import { seedDemoData, clearDemoData } from "@/lib/demo-data";
 
 const PATHWAY_KEY = "maai:pathway";
 
@@ -595,9 +596,43 @@ export function TopBar({ current }: { current?: "daily" | "summary" } = {}) {
             <ArrowLeft className="h-4 w-4" />
             Home
           </Link>
+          <DemoDataMenu />
         </nav>
       </div>
     </header>
+  );
+}
+
+function DemoDataMenu() {
+  function load() {
+    seedDemoData();
+    window.location.reload();
+  }
+  function clear() {
+    clearDemoData();
+    window.location.reload();
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={load}
+        title="Populate the app with ~45 days of realistic demo logs"
+        className="rounded-full border px-3 py-1 text-xs font-semibold"
+        style={{ borderColor: C.border, background: C.light, color: C.text }}
+      >
+        Load demo data
+      </button>
+      <button
+        type="button"
+        onClick={clear}
+        title="Remove demo logs and diagnosis profile"
+        className="rounded-full border px-2 py-1 text-xs"
+        style={{ borderColor: C.border, background: "#fff", color: C.muted }}
+      >
+        Clear
+      </button>
+    </div>
   );
 }
 
