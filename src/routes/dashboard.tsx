@@ -740,6 +740,7 @@ function IntakeCard({
           onScore={onPainScore}
           onDateTime={onPainDateTime}
           onNow={onPainDateTimeNow}
+          onShowBanner={onShowBanner}
         />
 
         <SocratesFields
