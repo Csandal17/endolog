@@ -825,13 +825,16 @@ function PainNrsField({
   onScore,
   onDateTime,
   onNow,
+  onShowBanner,
 }: {
   score: number;
   recordedAt: string;
   onScore: (n: number) => void;
   onDateTime: (v: string) => void;
   onNow: () => void;
+  onShowBanner?: (b: BannerContent) => void;
 }) {
+  const initialScoreRef = useRef(score);
   const swatch = painColor(score);
   const pct = (score / 10) * 100;
   const label =
