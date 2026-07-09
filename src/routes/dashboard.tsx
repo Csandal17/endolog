@@ -996,6 +996,7 @@ function WeeklyLog({
   onClear: () => void;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [openLog, setOpenLog] = useState<DailyLog | null>(null);
   const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
   const days = useMemo(() => buildWeekDays(logs, weekOffset), [logs, weekOffset]);
   const today = todayStr();
@@ -1059,8 +1060,10 @@ function WeeklyLog({
             <div key={d.date} className="flex flex-col items-center gap-2">
               {log ? (
                 <button
-                  onClick={() => onDelete(log.id)}
-                  title={`Remove ${d.label}`}
+                  type="button"
+                  onClick={() => setOpenLog(log)}
+                  title={`View ${d.label}`}
+                  aria-label={`View summary for ${d.label}`}
                   className="rounded-full"
                 >
                   <Flower severity={severity} size={48} outlined={isFlare} />
