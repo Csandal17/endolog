@@ -4,9 +4,15 @@ import type { StructuredReport } from "@/services/api";
 export const Route = createFileRoute("/api/reports/$id/pdf")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
-        const { getServerSupabase } = await import("@/lib/supabase-server");
-        const supabase = getServerSupabase();
+      GET: async ({ params, request }) => {
+        const { requireUserSupabase } = await import("@/lib/supabase-server");
+        let supabase;
+        try {
+          ({ supabase } = await requireUserSupabase(request));
+        } catch (e) {
+          if (e instanceof Response) return e;
+          throw e;
+        }
         const { data, error } = await supabase
           .from("reports")
           .select("id, structured_data, created_at")

@@ -26,7 +26,7 @@ import { jsPDF } from "jspdf";
 import * as api from "@/services/api";
 import type { Report as ApiReport, StructuredReport } from "@/services/api";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
       { title: "Log a symptom · Maai" },
