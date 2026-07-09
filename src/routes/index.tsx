@@ -91,11 +91,10 @@ function Hero() {
             The AI health advocate for endometriosis
           </Badge>
           <h1 className="mt-6 font-serif text-5xl leading-[1.02] tracking-tight text-charcoal sm:text-6xl lg:text-[68px]">
-            See what <em className="text-primary not-italic">time</em> reveals.
+            Better conversations. Better care.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-warm-grey">
-            Maai means the meaningful interval between things — the space where health patterns
-            emerge. Log what you've been experiencing in your own words. Bring a clear record
+            Log what you've been experiencing in your own words. Bring a clear record
             to every appointment.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
