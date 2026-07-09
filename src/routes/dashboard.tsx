@@ -42,8 +42,11 @@ const C = {
   deep: "#141210",     // charcoal for text on accent
   light: "#FBE9B8",    // soft butter for highlights
   pink: "#F5B8DB",
-  green: "#D6E1B4",    // sage tint
+  green: "#9AAB63",    // sage green (bolder for severity dot)
+  greenSoft: "#D6E1B4",// sage tint (for backgrounds/chips)
   blue: "#B6CAEB",     // powder blue
+  red: "#B8443A",      // deep warm red for severe / flare
+  redSoft: "#F4D7D2",  // red tint for backgrounds
 };
 
 // ---------------- Data model ----------------
@@ -169,10 +172,10 @@ function calcScore(input: {
 }
 
 function severityColor(s: ScoreBreakdown["severity"]): string {
-  if (s === "No symptoms") return C.green;
-  if (s === "Mild") return C.blue;
+  if (s === "No symptoms") return C.greenSoft;
+  if (s === "Mild") return C.green;
   if (s === "Moderate") return C.light;
-  return C.pink;
+  return C.red;
 }
 
 // ---------------- Flare logic ----------------
