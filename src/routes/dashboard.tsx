@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   Download,
@@ -358,19 +359,11 @@ function Dashboard() {
           </p>
         </header>
 
+        <section className="mb-8">
+          <WeeklyLog logs={logs} onDelete={deleteLog} onClear={clearLogs} />
+        </section>
+
         <DailyLogSection onSave={saveLog} onGeneratedReport={() => setHistoryRefresh((k) => k + 1)} logs={logs} />
-
-        <section className="mt-10">
-          <PatternOverTime logs={logs} onDelete={deleteLog} onClear={clearLogs} />
-        </section>
-
-        <section className="mt-10">
-          <ReportPreviewCard logs={logs} onGenerated={() => setHistoryRefresh((k) => k + 1)} />
-        </section>
-
-        <section className="mt-10">
-          <ReportHistoryCard refreshKey={historyRefresh} />
-        </section>
 
         <footer className="mt-12 pb-6 text-center text-xs" style={{ color: C.muted }}>
           <p>Maai does not diagnose. Always consult a clinician.</p>
@@ -399,14 +392,18 @@ function TopBar() {
             Maai
           </span>
         </Link>
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-sm"
-          style={{ color: C.muted }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Home
-        </Link>
+        <nav className="flex items-center gap-4 text-sm">
+          <Link to="/dashboard" className="font-semibold" style={{ color: C.text }}>
+            Daily log
+          </Link>
+          <Link to="/summary" style={{ color: C.muted }}>
+            Summary
+          </Link>
+          <Link to="/" className="inline-flex items-center gap-1" style={{ color: C.muted }}>
+            <ArrowLeft className="h-4 w-4" />
+            Home
+          </Link>
+        </nav>
       </div>
     </header>
   );
