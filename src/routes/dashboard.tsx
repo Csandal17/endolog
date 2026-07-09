@@ -1118,6 +1118,282 @@ function LegendItem({ icon, children }: { icon: React.ReactNode; children: React
   );
 }
 
+// ---------------- Pain trend line chart ----------------
+
+type TrendRange = "week" | "month" | "year";
+
+function PainTrendCard({ logs }: { logs: DailyLog[] }) {
+  const [range, setRange] = useState<TrendRange>("week");
+  const flare = useMemo(() => flareEpisodeIds(logs), [logs]);
+  const points = useMemo(() => buildTrendPoints(logs, range, flare.ids), [logs, range, flare.ids]);
+
+  return (
+    <SoftCard>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div
+            className="text-xs font-semibold uppercase tracking-[0.22em]"
+            style={{ color: C.muted }}
+          >
+            Pain trend
+          </div>
+          <h2
+            className="mt-1 text-2xl"
+            style={{ fontFamily: "Fraunces, serif", color: C.text }}
+          >
+            Pain over time
+          </h2>
+        </div>
+        <div
+          className="inline-flex rounded-full border p-1 text-xs"
+          style={{ borderColor: C.border, background: "#fff" }}
+        >
+          {(["week", "month", "year"] as TrendRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className="rounded-full px-3 py-1 capitalize transition"
+              style={{
+                background: range === r ? C.accent : "transparent",
+                color: range === r ? C.deep : C.muted,
+                fontWeight: range === r ? 700 : 500,
+              }}
+            >
+              {r === "week" ? "Weekly" : r === "month" ? "Monthly" : "Yearly"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6">
+        {points.length === 0 ? (
+          <div
+            className="rounded-2xl border border-dashed py-10 text-center text-sm"
+            style={{ borderColor: C.border, color: C.muted, background: C.bg }}
+          >
+            No data yet. Your pain trend appears after your first log.
+          </div>
+        ) : (
+          <LineChart points={points} />
+        )}
+      </div>
+    </SoftCard>
+  );
+}
+
+type TrendPoint = { label: string; value: number | null; flare: boolean };
+
+function buildTrendPoints(
+  logs: DailyLog[],
+  range: TrendRange,
+  flareIds: Set<string>,
+): TrendPoint[] {
+  if (logs.length === 0) return [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  if (range === "week") {
+    // last 7 days, average pain per day; flare if any log that day is flare
+    const out: TrendPoint[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = dateKey(d);
+      const matches = logs.filter((l) => l.date === key);
+      const value = matches.length
+        ? matches.reduce((a, l) => a + l.pain, 0) / matches.length
+        : null;
+      const flare = matches.some((l) => flareIds.has(l.id));
+      out.push({
+        label: d.toLocaleDateString(undefined, { weekday: "short" }),
+        value,
+        flare,
+      });
+    }
+    return out;
+  }
+
+  if (range === "month") {
+    // last 30 days, grouped into ~5 buckets of 6 days
+    const out: TrendPoint[] = [];
+    for (let bucket = 4; bucket >= 0; bucket--) {
+      const end = new Date(now);
+      end.setDate(end.getDate() - bucket * 6);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 5);
+      const matches = logs.filter((l) => {
+        const ld = new Date(l.date);
+        return ld >= start && ld <= end;
+      });
+      const value = matches.length
+        ? matches.reduce((a, l) => a + l.pain, 0) / matches.length
+        : null;
+      const flare = matches.some((l) => flareIds.has(l.id));
+      out.push({
+        label: `${start.getDate()}/${start.getMonth() + 1}`,
+        value,
+        flare,
+      });
+    }
+    return out;
+  }
+
+  // year: last 12 months, average pain per month
+  const out: TrendPoint[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const matches = logs.filter((l) => {
+      const ld = new Date(l.date);
+      return ld >= d && ld < nextMonth;
+    });
+    const value = matches.length
+      ? matches.reduce((a, l) => a + l.pain, 0) / matches.length
+      : null;
+    const flare = matches.some((l) => flareIds.has(l.id));
+    out.push({
+      label: d.toLocaleDateString(undefined, { month: "short" }),
+      value,
+      flare,
+    });
+  }
+  return out;
+}
+
+function dateKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function LineChart({ points }: { points: TrendPoint[] }) {
+  const W = 720;
+  const H = 220;
+  const padL = 34;
+  const padR = 12;
+  const padT = 12;
+  const padB = 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = points.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0;
+  const yFor = (v: number) => padT + innerH - (v / 10) * innerH;
+  const xFor = (i: number) => padL + i * stepX;
+
+  // build path skipping nulls
+  const segments: string[] = [];
+  let current: string[] = [];
+  points.forEach((p, i) => {
+    if (p.value == null) {
+      if (current.length) segments.push(current.join(" "));
+      current = [];
+    } else {
+      const cmd = current.length === 0 ? "M" : "L";
+      current.push(`${cmd}${xFor(i).toFixed(1)},${yFor(p.value).toFixed(1)}`);
+    }
+  });
+  if (current.length) segments.push(current.join(" "));
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-auto w-full min-w-[520px]"
+        role="img"
+        aria-label="Pain over time"
+      >
+        {/* y-axis gridlines: 0, 2, 4, 6, 8, 10 */}
+        {[0, 2, 4, 6, 8, 10].map((v) => (
+          <g key={v}>
+            <line
+              x1={padL}
+              x2={W - padR}
+              y1={yFor(v)}
+              y2={yFor(v)}
+              stroke={C.border}
+              strokeWidth={1}
+              strokeDasharray={v === 0 ? "0" : "3 4"}
+            />
+            <text
+              x={padL - 8}
+              y={yFor(v) + 4}
+              fontSize="10"
+              textAnchor="end"
+              fill={C.muted}
+              fontFamily="Karla, sans-serif"
+            >
+              {v}
+            </text>
+          </g>
+        ))}
+
+        {/* line segments */}
+        {segments.map((d, i) => (
+          <path
+            key={i}
+            d={d}
+            fill="none"
+            stroke={C.deep}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+
+        {/* points */}
+        {points.map((p, i) =>
+          p.value == null ? null : (
+            <g key={i}>
+              <circle
+                cx={xFor(i)}
+                cy={yFor(p.value)}
+                r={p.flare ? 6 : 4}
+                fill={p.flare ? C.accent : "#fff"}
+                stroke={C.deep}
+                strokeWidth={p.flare ? 3 : 1.5}
+              />
+            </g>
+          ),
+        )}
+
+        {/* x labels */}
+        {points.map((p, i) => (
+          <text
+            key={`x-${i}`}
+            x={xFor(i)}
+            y={H - 8}
+            fontSize="10"
+            textAnchor="middle"
+            fill={C.muted}
+            fontFamily="Karla, sans-serif"
+          >
+            {p.label}
+          </text>
+        ))}
+      </svg>
+
+      <div
+        className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs"
+        style={{ color: C.muted }}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full border"
+            style={{ borderColor: C.deep, background: "#fff" }}
+          />
+          Average pain (0–10)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block h-3 w-3 rounded-full border-[2px]"
+            style={{ borderColor: C.deep, background: C.accent }}
+          />
+          Flare episode
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function shiftDate(date: string, deltaDays: number): string {
   const d = new Date(date);
   d.setDate(d.getDate() + deltaDays);
