@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import endoherLogo from "@/assets/endoher-logo.png";
+import niceLogo from "@/assets/nice-guidelines.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -29,6 +30,7 @@ function Index() {
       <Testimonial />
       <CTA />
       <BrandMark />
+      <TrustedGuidelines />
       <Footer />
     </div>
   );
@@ -542,6 +544,51 @@ function BrandMark() {
 }
 
 function _Footer() {
+  return _FooterImpl();
+}
+
+function TrustedGuidelines() {
+  return (
+    <section className="mx-auto max-w-6xl px-6 pb-20">
+      <div className="rounded-[2rem] border border-border/60 bg-secondary/40 p-8 sm:p-10">
+        <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-[auto_1fr]">
+          <div
+            className="flex items-center justify-center rounded-2xl bg-background p-5"
+            style={{ minWidth: 180 }}
+          >
+            <img
+              src={niceLogo.url}
+              alt="NICE — National Institute for Health and Care Excellence"
+              width={200}
+              height={120}
+              loading="lazy"
+              className="h-auto w-40 object-contain"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-warm-grey">
+              Built on trusted clinical guidance
+            </p>
+            <h3 className="mt-2 font-serif text-2xl leading-tight tracking-tight text-charcoal sm:text-3xl">
+              Aligned with NICE guidelines.
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-warm-grey">
+              EndoHer's symptom vocabulary, severity thresholds and clinician-facing summaries
+              are shaped by NICE guideline NG73 on endometriosis diagnosis and management, so
+              the record you bring to appointments speaks the same language your GP already
+              trusts.
+            </p>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-warm-grey">
+              NICE logo shown for reference only. EndoHer is not affiliated with or endorsed by NICE.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function _FooterImpl() {
   return (
     <footer className="border-t border-border/40 bg-background">
       <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 py-14 text-sm md:grid-cols-4">
