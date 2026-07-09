@@ -333,20 +333,20 @@ function StatCard({ headline, body, tint }: { headline: string; body: string; ti
 const steps = [
   {
     icon: NotebookPen,
-    title: "Describe it in your own words",
-    body: "Any level of detail. A sentence a day is enough. EndoHer never asks you to translate your body into a form.",
+    title: "Describe your symptoms, we translate it clinically",
+    body: "Say how you feel. We map it to vocabulary a doctor recognises.",
     tint: "pink",
   },
   {
     icon: Sparkles,
-    title: "EndoHer maps to clinical terms",
-    body: "Your words are gently mapped to the vocabulary a doctor recognises. Nothing is diagnosed. Nothing is decided.",
+    title: "Be reminded to get clinician support",
+    body: "Once your symptom severity & frequency crosses the clinical threshold, we send you a reminder to book the GP.",
     tint: "powder",
   },
   {
     icon: Stethoscope,
-    title: "Bring a record to every appointment",
-    body: "Over weeks, the pattern builds. Share a clear, timestamped summary with your clinician. They interpret. You are heard.",
+    title: "The full picture, at every visit",
+    body: "Over weeks the pattern builds into a summary of trends. The clinician interprets and acts on it right away.",
     tint: "sage",
   },
 ] as const;
