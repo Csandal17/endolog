@@ -2152,7 +2152,7 @@ function TrendMiniCard({
         {label}
       </div>
       <dl className="mt-3 space-y-2 text-sm">
-        <TrendRow k="Avg burden score">
+        <TrendRow k="Average score">
           {avg == null ? "—" : (
             <>
               <span className="font-semibold">{avg}</span>
