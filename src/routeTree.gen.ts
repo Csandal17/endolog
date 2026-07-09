@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProcessRouteImport } from './routes/api/process'
 import { Route as ApiReportsIndexRouteImport } from './routes/api/reports/index'
@@ -19,6 +20,11 @@ import { Route as ApiReportsIdPdfRouteImport } from './routes/api/reports/$id/pd
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckInRoute = CheckInRouteImport.update({
+  id: '/check-in',
+  path: '/check-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -49,6 +55,7 @@ const ApiReportsIdPdfRoute = ApiReportsIdPdfRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/check-in': typeof CheckInRoute
   '/dashboard': typeof DashboardRoute
   '/api/process': typeof ApiProcessRoute
   '/api/reports/$id': typeof ApiReportsIdRouteWithChildren
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/check-in'
     | '/dashboard'
     | '/api/process'
     | '/api/reports/$id'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/check-in'
     | '/dashboard'
     | '/api/process'
     | '/api/reports/$id'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/check-in'
     | '/dashboard'
     | '/api/process'
     | '/api/reports/$id'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CheckInRoute: typeof CheckInRoute
   DashboardRoute: typeof DashboardRoute
   ApiProcessRoute: typeof ApiProcessRoute
   ApiReportsIdRoute: typeof ApiReportsIdRouteWithChildren
@@ -114,6 +127,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/check-in': {
+      id: '/check-in'
+      path: '/check-in'
+      fullPath: '/check-in'
+      preLoaderRoute: typeof CheckInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -168,6 +188,7 @@ const ApiReportsIdRouteWithChildren = ApiReportsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CheckInRoute: CheckInRoute,
   DashboardRoute: DashboardRoute,
   ApiProcessRoute: ApiProcessRoute,
   ApiReportsIdRoute: ApiReportsIdRouteWithChildren,
