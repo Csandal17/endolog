@@ -1108,6 +1108,7 @@ function ConfirmationCard({ log, onBack }: { log: DailyLog; onBack: () => void }
     bleedingUnexpected: log.bleedingUnexpected,
     impact: log.impactChosen ? log.impact : 0,
   });
+  const symptomKeys = logToSymptomKeys(log);
   return (
     <SoftCard>
       <div className="grid place-items-center py-6 text-center">
@@ -1137,6 +1138,12 @@ function ConfirmationCard({ log, onBack }: { log: DailyLog; onBack: () => void }
             View report preview
           </Link>
         </div>
+
+        {symptomKeys.length > 0 && (
+          <div className="mt-8 w-full text-left">
+            <EmpathyBannerStack symptoms={symptomKeys} />
+          </div>
+        )}
       </div>
     </SoftCard>
   );
