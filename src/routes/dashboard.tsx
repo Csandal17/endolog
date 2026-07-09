@@ -635,6 +635,10 @@ function Step1({
   onPain: (n: number) => void;
   onContinue: () => void;
 }) {
+  const [showTip, setShowTip] = useState(false);
+  const openTip = () => setShowTip(true);
+  const closeTip = () => setShowTip(false);
+  const pct = Math.max(0, Math.min(100, pain * 10));
   return (
     <div>
       <h2 className="text-2xl leading-snug" style={{ fontFamily: "Fraunces, serif", color: C.text }}>
@@ -646,13 +650,30 @@ function Step1({
 
       <div className="mt-8 flex items-center gap-5">
         <div className="flex-1">
-          <Slider
-            value={[pain]}
-            min={0}
-            max={10}
-            step={1}
-            onValueChange={([v]) => onPain(v)}
-          />
+          <div
+            className="relative"
+            onPointerEnter={openTip}
+            onPointerDown={openTip}
+            onPointerLeave={closeTip}
+            onPointerUp={closeTip}
+            onPointerCancel={closeTip}
+            onFocusCapture={openTip}
+            onBlurCapture={closeTip}
+            onTouchStart={openTip}
+            onTouchEnd={closeTip}
+          >
+            <PainTooltip value={pain} pct={pct} visible={showTip} />
+            <Slider
+              value={[pain]}
+              min={0}
+              max={10}
+              step={1}
+              onValueChange={([v]) => {
+                setShowTip(true);
+                onPain(v);
+              }}
+            />
+          </div>
           <div className="mt-3 flex justify-between text-xs" style={{ color: C.muted }}>
             <span>No pain</span>
             <span>Worst imaginable</span>
@@ -674,6 +695,61 @@ function Step1({
 
       <div className="mt-8 flex justify-end">
         <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+const PAIN_TOOLTIP_MESSAGES: Record<number, string> = {
+  0: "No pain today. This is useful information too.",
+  1: "Mild discomfort. Small changes can still help show your pattern.",
+  2: "Low pain logged. Recording it early helps build your symptom history.",
+  3: "Mild to moderate pain. Let's note where it was and what it felt like.",
+  4: "Moderate pain. We'll ask a few quick follow-up questions.",
+  5: "Noticeable pain. Let's capture the location, symptoms, and what helped.",
+  6: "Strong pain. We'll record this clearly in your symptom history.",
+  7: "Severe pain. This is a high-burden day, so let's capture the details.",
+  8: "Very severe pain. You should not have to explain this from memory later.",
+  9: "Extremely severe pain. This is important to record clearly.",
+  10: "Worst pain. We'll help you document this for future clinical review.",
+};
+
+function PainTooltip({ value, pct, visible }: { value: number; pct: number; visible: boolean }) {
+  return (
+    <div
+      aria-hidden={!visible}
+      className="pointer-events-none absolute left-0 right-0 z-20"
+      style={{ top: -12, transform: "translateY(-100%)" }}
+    >
+      <div className="relative h-0">
+        <div
+          className="absolute"
+          style={{
+            left: `${pct}%`,
+            transform: "translateX(-50%)",
+            maxWidth: 240,
+            width: "max-content",
+            opacity: visible ? 0.92 : 0,
+            transition: "opacity 180ms ease",
+          }}
+        >
+          <div
+            className="rounded-xl border px-3 py-2 shadow-md"
+            style={{
+              background: "#FFFDF7",
+              borderColor: "#E8DFD1",
+              color: "#3B1F2B",
+              boxShadow: "0 6px 18px rgba(59,31,43,0.12)",
+            }}
+          >
+            <p className="text-[13px] font-semibold leading-tight" style={{ color: "#3B1F2B" }}>
+              Pain {value} out of 10
+            </p>
+            <p className="mt-1 text-[12px] leading-snug" style={{ color: "#5A3B48" }}>
+              {PAIN_TOOLTIP_MESSAGES[value]}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
