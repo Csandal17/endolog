@@ -398,8 +398,8 @@ function ReassuranceBanner({
           <Sparkles className="h-4 w-4 text-charcoal" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-charcoal">{stat}</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-warm-grey">{message}</p>
+          <p className="text-sm font-semibold text-charcoal">{message}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-warm-grey">{stat}</p>
         </div>
         {onDismiss && (
           <button
@@ -850,12 +850,11 @@ function PainNrsField({
   onNow: () => void;
   onShowBanner?: (b: BannerContent) => void;
 }) {
-  const initialScoreRef = useRef(score);
   const prevScoreRef = useRef(score);
   useEffect(() => {
     if (score !== prevScoreRef.current) {
       prevScoreRef.current = score;
-      if (score !== initialScoreRef.current && onShowBanner) {
+      if (onShowBanner) {
         onShowBanner(getPainBanner(score));
       }
     }
