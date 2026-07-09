@@ -30,6 +30,7 @@ function Index() {
       <Testimonial />
       <CTA />
       <BrandMark />
+      <TrustedGuidelines />
       <Footer />
     </div>
   );
