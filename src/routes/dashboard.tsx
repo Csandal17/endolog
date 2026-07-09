@@ -2759,6 +2759,18 @@ function Flower({
   const petals = [0, 60, 120, 180, 240, 300];
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      {/* Binary flare ring: a distinct, high-contrast charcoal circle
+          around the whole flower so flare days are unmistakable. */}
+      {outlined && (
+        <circle
+          cx="50"
+          cy="50"
+          r="46"
+          fill="none"
+          stroke={C.deep}
+          strokeWidth={5}
+        />
+      )}
       {petals.map((r) => (
         <ellipse
           key={r}
@@ -2767,20 +2779,10 @@ function Flower({
           rx="12"
           ry="18"
           fill={fill}
-          stroke={outlined ? C.red : "none"}
-          strokeWidth={outlined ? 3.5 : 0}
-          strokeLinejoin="round"
           transform={`rotate(${r} 50 50)`}
         />
       ))}
-      <circle
-        cx="50"
-        cy="50"
-        r="10"
-        fill={outlined ? C.red : C.deep}
-        stroke={outlined ? C.red : "none"}
-        strokeWidth={outlined ? 3.5 : 0}
-      />
+      <circle cx="50" cy="50" r="10" fill={C.deep} />
     </svg>
   );
 }
