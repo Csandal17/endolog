@@ -380,9 +380,12 @@ function Dashboard() {
         | "diagnosed"
         | null;
       if (stored) setPathway(stored);
-      else setShowPathway(true);
+      else {
+        window.localStorage.setItem(PATHWAY_KEY, "suspected");
+        setPathway("suspected");
+      }
     } catch {
-      setShowPathway(true);
+      setPathway("suspected");
     }
   }, []);
 
