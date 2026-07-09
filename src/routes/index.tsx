@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import endoherLogo from "@/assets/endoher-logo.png";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -35,9 +36,13 @@ function Index() {
 function Wordmark({ className = "" }: { className?: string }) {
   return (
     <Link to="/" className={`flex items-center gap-2 ${className}`}>
-      <div className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
-        <span className="font-serif text-base leading-none">M</span>
-      </div>
+      <img
+        src={endoherLogo}
+        alt="EndoHer logo"
+        width={36}
+        height={36}
+        className="h-9 w-9 rounded-2xl"
+      />
       <span className="font-serif text-2xl tracking-tight text-charcoal">EndoHer</span>
     </Link>
   );
