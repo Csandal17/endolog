@@ -1733,6 +1733,139 @@ function recurringTerms(logs: DailyLog[]): { term: string; count: number }[] {
     .slice(0, 8);
 }
 
+// ---------------- SOCRATES aggregation ----------------
+
+const PAIN_CHARACTER = new Set([
+  "Cramping",
+  "Stabbing",
+  "Burning",
+  "Dull ache",
+  "Radiating to legs",
+]);
+
+type SocratesRow = { label: string; value: string };
+
+function buildSocrates(logs: DailyLog[]): SocratesRow[] {
+  if (logs.length === 0) return [];
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  const total = logs.length;
+
+  const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+  const topList = (m: Map<string, number>, n = 4) =>
+    Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([term, c]) => `${term} (${c} ${c === 1 ? "day" : "days"})`);
+
+  // Site — count days a site was logged with any descriptor
+  const siteCounts = new Map<string, number>();
+  for (const l of logs) for (const s of Object.keys(l.siteDescriptors)) bump(siteCounts, s);
+
+  // Character — pain descriptors across all sites
+  const charCounts = new Map<string, number>();
+  for (const l of logs) {
+    const seen = new Set<string>();
+    for (const descs of Object.values(l.siteDescriptors)) {
+      for (const d of descs) if (PAIN_CHARACTER.has(d) && d !== "Radiating to legs") seen.add(d);
+    }
+    seen.forEach((d) => bump(charCounts, d));
+  }
+
+  // Radiation
+  const radiationDays = logs.filter((l) =>
+    Object.values(l.siteDescriptors).some((d) => d.includes("Radiating to legs")),
+  ).length;
+
+  // Associations — whole-body + non-pain-character site descriptors + bleeding
+  const assocCounts = new Map<string, number>();
+  for (const l of logs) {
+    const seen = new Set<string>();
+    for (const s of l.wholeBody) seen.add(s);
+    for (const descs of Object.values(l.siteDescriptors)) {
+      for (const d of descs) if (!PAIN_CHARACTER.has(d)) seen.add(d);
+    }
+    if (l.bleedingUnexpected) seen.add("Unexpected bleeding");
+    seen.forEach((s) => bump(assocCounts, s));
+  }
+
+  // Time course
+  const first = sorted[0].date;
+  const last = sorted[sorted.length - 1].date;
+  const span = daysBetween(first, last) + 1;
+  const { episodes } = flareEpisodeIds(logs);
+
+  // Exacerbating / relieving
+  const worse = new Map<string, number>();
+  const better = new Map<string, number>();
+  for (const l of logs) {
+    const w = l.detail.worse.trim();
+    const b = l.detail.better.trim();
+    if (w) bump(worse, w);
+    if (b) bump(better, b);
+  }
+  const medHelped = logs.filter((l) => l.medicationEffect === "Helped").length;
+  const medPartly = logs.filter((l) => l.medicationEffect === "Partly").length;
+  const medNone = logs.filter((l) => l.medicationEffect === "No effect").length;
+
+  // Severity — average pain, peak, distribution
+  const avgPain = (logs.reduce((a, l) => a + l.pain, 0) / total).toFixed(1);
+  const peakPain = Math.max(...logs.map((l) => l.pain));
+  const mildDays = logs.filter((l) => l.pain > 0 && l.pain < 4).length;
+  const modDays = logs.filter((l) => l.pain >= 4 && l.pain < 7).length;
+  const sevDays = logs.filter((l) => l.pain >= 7).length;
+
+  const dash = "Not described";
+  const joinOr = (arr: string[]) => (arr.length ? arr.join(", ") : dash);
+
+  const onsetDate = new Date(first).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const timeCourseParts: string[] = [];
+  timeCourseParts.push(`${total} of ${span} ${span === 1 ? "day" : "days"} logged in this window`);
+  if (episodes.length > 0) {
+    timeCourseParts.push(
+      `${episodes.length} confirmed flare ${episodes.length === 1 ? "episode" : "episodes"}`,
+    );
+  }
+
+  const relievingParts: string[] = [];
+  if (better.size > 0) relievingParts.push(topList(better, 3).join("; "));
+  if (medHelped + medPartly > 0) {
+    relievingParts.push(
+      `Medication: helped ${medHelped}d, partly ${medPartly}d, no effect ${medNone}d`,
+    );
+  } else if (medNone > 0) {
+    relievingParts.push(`Medication: no effect ${medNone}d`);
+  }
+
+  return [
+    { label: "Site", value: joinOr(topList(siteCounts)) },
+    { label: "Onset", value: `First logged ${onsetDate}; tracked over ${span} ${span === 1 ? "day" : "days"}` },
+    { label: "Character", value: joinOr(topList(charCounts)) },
+    {
+      label: "Radiation",
+      value: radiationDays > 0 ? `Radiating to legs on ${radiationDays} ${radiationDays === 1 ? "day" : "days"}` : dash,
+    },
+    { label: "Associations", value: joinOr(topList(assocCounts, 6)) },
+    { label: "Time course", value: timeCourseParts.join("; ") },
+    {
+      label: "Exacerbating factors",
+      value: worse.size > 0 ? topList(worse, 3).join("; ") : dash,
+    },
+    {
+      label: "Relieving factors",
+      value: relievingParts.length > 0 ? relievingParts.join(" · ") : dash,
+    },
+    {
+      label: "Severity",
+      value: `Average ${avgPain}/10, peak ${peakPain}/10 · Mild ${mildDays}d · Moderate ${modDays}d · Severe ${sevDays}d`,
+    },
+  ];
+}
+
 // ---------------- Report preview ----------------
 
 export function ReportPreviewCard({
