@@ -743,12 +743,6 @@ function IntakeCard({
           onShowBanner={onShowBanner}
         />
 
-        <SocratesFields
-          answers={form.socrates}
-          onChange={setSocrates}
-          onShowBanner={onShowBanner}
-        />
-
         <AnimatePresence>
           {banner?.stat && (
             <ReassuranceBanner
@@ -759,6 +753,12 @@ function IntakeCard({
             />
           )}
         </AnimatePresence>
+
+        <SocratesFields
+          answers={form.socrates}
+          onChange={setSocrates}
+          onShowBanner={onShowBanner}
+        />
 
         <Field
           label="What have you been experiencing?"
