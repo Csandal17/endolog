@@ -3,6 +3,8 @@
 **The AI health advocate for endometriosis.**
 *How you feel IS valid.*
 
+<img width="1436" height="692" alt="endoherdemo" src="https://github.com/user-attachments/assets/1e0b11ab-60e3-4868-ba8f-27db84e0b964" />
+
 Keep a timeline of your symptoms so every appointment starts with the full picture. EndoHer logs what you've been experiencing in your own words, maps it to clinical terms a doctor recognises, and builds a record you can bring to every visit — so the pattern of what you're living with becomes visible over time.
 
 Built for the [ZOE Women in Tech Hackathon 2026](https://zoe.com) · Team 5
